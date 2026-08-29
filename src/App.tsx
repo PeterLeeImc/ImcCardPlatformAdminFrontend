@@ -45,7 +45,10 @@ function RequireAuth({ children }: { children: React.ReactElement }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    // basename跟著vite.config.ts的base走：本機dev是"/"，正式打包是"/ImcCardPlatformAdmin/"，
+    // 部署在非根路徑時React Router才能正確比對目前網址對應到哪個路由(不然/employees這種路由
+    // 在/ImcCardPlatformAdmin/employees底下永遠比對不到)。
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
