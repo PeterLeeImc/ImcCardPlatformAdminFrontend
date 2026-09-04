@@ -1,37 +1,25 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Button, Form, Input, Layout, Modal, Select, Space, Table, message } from 'antd'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Button, Form, Input, Layout, Modal, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
-import type { ComTimeScheduleItem, ComTimeScheduleUpsertRequest, CompanyListItem, LogPage } from '../types'
+import type { ComTimeScheduleItem, ComTimeScheduleUpsertRequest } from '../types'
 
 export default function ComTimeScheduleList() {
   const navigate = useNavigate()
-  const [companies, setCompanies] = useState<CompanyListItem[]>([])
-  const [companyId, setCompanyId] = useState<number>()
+  const { companyId, dispatchCaseId } = useParams<{ companyId: string; dispatchCaseId: string }>()
   const [rows, setRows] = useState<ComTimeScheduleItem[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<ComTimeScheduleItem | 'new'>()
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm<ComTimeScheduleUpsertRequest>()
 
-  useEffect(() => {
-    apiClient
-      .get<LogPage<CompanyListItem>>('/admin/companies', { params: { page: 0, size: 200 } })
-      .then((res) => {
-        setCompanies(res.data.content)
-        if (res.data.content.length > 0) {
-          setCompanyId(res.data.content[0].id)
-        }
-      })
-      .catch(() => message.error('載入公司清單失敗'))
-  }, [])
+  const basePath = `/admin/companies/${companyId}/dispatch-cases/${dispatchCaseId}/time-schedules`
 
   const fetchRows = () => {
-    if (!companyId) return
     setLoading(true)
     apiClient
-      .get<ComTimeScheduleItem[]>(`/admin/companies/${companyId}/time-schedules`)
+      .get<ComTimeScheduleItem[]>(basePath)
       .then((res) => setRows(res.data))
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
@@ -43,7 +31,7 @@ export default function ComTimeScheduleList() {
   useEffect(() => {
     fetchRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId])
+  }, [companyId, dispatchCaseId])
 
   const openEdit = (row: ComTimeScheduleItem | 'new') => {
     setEditing(row)
@@ -61,15 +49,15 @@ export default function ComTimeScheduleList() {
   }
 
   const submitEdit = async () => {
-    if (!editing || !companyId) return
+    if (!editing) return
     try {
       const values = await form.validateFields()
       setSaving(true)
       if (editing === 'new') {
-        await apiClient.post(`/admin/companies/${companyId}/time-schedules`, values)
+        await apiClient.post(basePath, values)
         message.success('已新增班表')
       } else {
-        await apiClient.put(`/admin/companies/${companyId}/time-schedules/${editing.id}`, values)
+        await apiClient.put(`${basePath}/${editing.id}`, values)
         message.success('已更新班表')
       }
       setEditing(undefined)
@@ -84,14 +72,13 @@ export default function ComTimeScheduleList() {
   }
 
   const handleDelete = (row: ComTimeScheduleItem) => {
-    if (!companyId) return
     Modal.confirm({
       title: '確定要刪除這個班表？',
       content: `班別代碼：${row.workType}`,
       okType: 'danger',
       onOk: async () => {
         try {
-          await apiClient.delete(`/admin/companies/${companyId}/time-schedules/${row.id}`)
+          await apiClient.delete(`${basePath}/${row.id}`)
           message.success('刪除成功')
           fetchRows()
         } catch (err) {
@@ -135,23 +122,15 @@ export default function ComTimeScheduleList() {
         }}
       >
         <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
+          <a onClick={() => navigate('/companies')}>公司維護</a>
+          <a onClick={() => navigate('/dispatch-cases')}>派遣個案</a>
           <span style={{ fontSize: 18, fontWeight: 600 }}>班表內容</span>
         </Space>
-        <Button type="primary" onClick={() => openEdit('new')} disabled={!companyId}>
+        <Button type="primary" onClick={() => openEdit('new')}>
           新增班表
         </Button>
       </div>
       <div style={{ padding: 24 }}>
-        <Space style={{ marginBottom: 16 }}>
-          <Select
-            style={{ width: 240 }}
-            placeholder="選擇公司"
-            value={companyId}
-            onChange={setCompanyId}
-            options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
-          />
-        </Space>
         <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
       </div>
       <Modal

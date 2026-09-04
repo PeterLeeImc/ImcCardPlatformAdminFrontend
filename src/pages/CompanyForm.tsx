@@ -24,18 +24,46 @@ const pendingIcon = dotIcon('#ff4d4f')
 interface CompanyFormValues {
   companyNum: string
   chName: string
-  enName: string
   name4Short: string
   uniformNum: string
-  nation: string
-  phone: string
-  fax: string
-  addrZipCode: string
   addr: string
-  website: string
-  email: string
   punchMethod: string
   gpsRadiusMeters: number
+}
+
+/**
+ * 依序砍掉地址尾端的樓層/門牌/巷弄/段等細節，回傳由細到粗的候選地址清單。
+ * 例如"台北市松山區敦化南路一段2號10樓"查不到座標時，改試"...2號"、"...一段"，
+ * 用來讓查無座標時能自動退而求其次找到大致位置。
+ */
+function shortenAddressCandidates(addr: string): string[] {
+  const candidates = [addr]
+  let current = addr
+  const patterns = [
+    /之[\d]+$/, // 之5(樓層房號後綴，如10樓之5)
+    /[\d]+樓$/, // 10樓
+    /[\d]+室$/, // X室
+    /[\d]+號$/, // 2號
+    /[\d]+弄$/, // X弄
+    /[\d]+巷$/, // X巷
+    /[〇零一二三四五六七八九十百千\d]+段$/, // 一段
+  ]
+  // 每輪只套用第一個命中的pattern就重新開始，讓「之5」「10樓」這類疊加的尾端單位能逐一剝除，
+  // 而不是每個pattern只各自套用一次(否則"之5"擋住後面的"樓"pattern永遠match不到)。
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const pattern of patterns) {
+      const next = current.replace(pattern, '').trim()
+      if (next !== current && next.length > 0) {
+        candidates.push(next)
+        current = next
+        changed = true
+        break
+      }
+    }
+  }
+  return candidates
 }
 
 /**
@@ -75,6 +103,7 @@ export default function CompanyForm() {
   const [geocoding, setGeocoding] = useState(false)
   const [savedPosition, setSavedPosition] = useState<[number, number] | null>(null)
   const [pendingPosition, setPendingPosition] = useState<[number, number] | null>(null)
+  const [detail, setDetail] = useState<CompanyDetail>()
 
   useEffect(() => {
     if (!isEdit) return
@@ -83,19 +112,13 @@ export default function CompanyForm() {
       .get<CompanyDetail>(`/admin/companies/${id}`)
       .then((res) => {
         const d = res.data
+        setDetail(d)
         form.setFieldsValue({
           companyNum: d.companyNum,
           chName: d.chName,
-          enName: d.enName ?? '',
           name4Short: d.name4Short,
           uniformNum: d.uniformNum,
-          nation: d.nation,
-          phone: d.phone ?? '',
-          fax: d.fax ?? '',
-          addrZipCode: d.addrZipCode ?? '',
           addr: d.addr ?? '',
-          website: d.website ?? '',
-          email: d.email ?? '',
           punchMethod: d.punchMethod ?? 'GPS',
           gpsRadiusMeters: d.gpsRadiusMeters ?? 200,
         })
@@ -125,16 +148,27 @@ export default function CompanyForm() {
     }
     setGeocoding(true)
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(addr)}`,
-      )
-      const results = (await res.json()) as { lat: string; lon: string }[]
-      if (results.length === 0) {
-        message.warning('查無這個地址的座標，請改用地圖手動點選')
-        return
+      const candidates = shortenAddressCandidates(addr.trim())
+      for (let i = 0; i < candidates.length; i++) {
+        const candidate = candidates[i]
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(candidate)}`,
+          { headers: { 'Accept-Language': 'zh-TW' } },
+        )
+        const results = (await res.json()) as { lat: string; lon: string }[]
+        if (results.length > 0) {
+          setPendingPosition([parseFloat(results[0].lat), parseFloat(results[0].lon)])
+          if (i === 0) {
+            message.success('已在地圖上標出查詢到的位置，請確認後按「套用地圖座標」')
+          } else {
+            message.warning(
+              `完整地址查無座標，已改用「${candidate}」查到附近位置，請在地圖上微調後按「套用地圖座標」`,
+            )
+          }
+          return
+        }
       }
-      setPendingPosition([parseFloat(results[0].lat), parseFloat(results[0].lon)])
-      message.success('已在地圖上標出查詢到的位置，請確認後按「套用地圖座標」')
+      message.warning('查無這個地址附近的座標，請改用地圖手動點選')
     } catch {
       message.error('地址轉座標查詢失敗，請改用地圖手動點選')
     } finally {
@@ -147,16 +181,9 @@ export default function CompanyForm() {
     try {
       const base = {
         chName: values.chName,
-        enName: values.enName || undefined,
         name4Short: values.name4Short,
         uniformNum: values.uniformNum,
-        nation: values.nation,
-        phone: values.phone || undefined,
-        fax: values.fax || undefined,
-        addrZipCode: values.addrZipCode || undefined,
         addr: values.addr || undefined,
-        website: values.website || undefined,
-        email: values.email || undefined,
         latitude: savedPosition?.[0],
         longitude: savedPosition?.[1],
         punchMethod: values.punchMethod,
@@ -188,6 +215,7 @@ export default function CompanyForm() {
         style={{
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           padding: '16px 24px',
           background: '#fff',
           borderBottom: '1px solid #eee',
@@ -197,6 +225,7 @@ export default function CompanyForm() {
           <a onClick={() => navigate('/companies')}>公司維護</a>
           <span style={{ fontSize: 18, fontWeight: 600 }}>{isEdit ? '編輯公司' : '新增公司'}</span>
         </Space>
+        {isEdit && <a onClick={() => navigate(`/dispatch-cases?companyId=${id}`)}>前往派遣個案 / 班表 →</a>}
       </div>
       <div style={{ maxWidth: 720, margin: '32px auto', width: '100%', background: '#fff', borderRadius: 12, padding: 32 }}>
         <Spin spinning={loading}>
@@ -204,9 +233,13 @@ export default function CompanyForm() {
             form={form}
             layout="vertical"
             onFinish={onFinish}
-            initialValues={{ nation: 'TWN', punchMethod: 'GPS', gpsRadiusMeters: 200 }}
+            initialValues={{ punchMethod: 'GPS', gpsRadiusMeters: 200 }}
           >
-            {!isEdit && (
+            {isEdit ? (
+              <Form.Item label="公司代碼">
+                <Input value={detail?.companyNum} disabled />
+              </Form.Item>
+            ) : (
               <Form.Item name="companyNum" label="公司代碼" rules={[{ required: true, message: '請輸入公司代碼' }]}>
                 <Input placeholder="公司代碼" />
               </Form.Item>
@@ -214,26 +247,11 @@ export default function CompanyForm() {
             <Form.Item name="chName" label="中文名稱" rules={[{ required: true, message: '請輸入中文名稱' }]}>
               <Input placeholder="中文名稱" />
             </Form.Item>
-            <Form.Item name="enName" label="英文名稱">
-              <Input placeholder="英文名稱" />
-            </Form.Item>
             <Form.Item name="name4Short" label="公司簡稱" rules={[{ required: true, message: '請輸入公司簡稱' }]}>
               <Input placeholder="公司簡稱" />
             </Form.Item>
             <Form.Item name="uniformNum" label="統一編號" rules={[{ required: true, message: '請輸入統一編號' }]}>
               <Input placeholder="統一編號" />
-            </Form.Item>
-            <Form.Item name="nation" label="國別" rules={[{ required: true, message: '請輸入國別' }]}>
-              <Input placeholder="國別" />
-            </Form.Item>
-            <Form.Item name="phone" label="電話">
-              <Input placeholder="電話" />
-            </Form.Item>
-            <Form.Item name="fax" label="傳真">
-              <Input placeholder="傳真" />
-            </Form.Item>
-            <Form.Item name="addrZipCode" label="郵遞區號">
-              <Input placeholder="郵遞區號" style={{ width: 160 }} />
             </Form.Item>
             <Form.Item name="addr" label="地址">
               <Space.Compact style={{ width: '100%' }}>
@@ -242,12 +260,6 @@ export default function CompanyForm() {
                   地址轉座標
                 </Button>
               </Space.Compact>
-            </Form.Item>
-            <Form.Item name="website" label="網站">
-              <Input placeholder="網站" />
-            </Form.Item>
-            <Form.Item name="email" label="Email" rules={[{ type: 'email', message: 'Email格式不正確' }]}>
-              <Input placeholder="Email" />
             </Form.Item>
             <Form.Item name="punchMethod" label="打卡方式">
               <Select options={PUNCH_METHOD_OPTIONS} />
@@ -286,6 +298,12 @@ export default function CompanyForm() {
                 </div>
               )}
             </Form.Item>
+            {isEdit && detail && (
+              <div style={{ marginBottom: 16, fontSize: 12, color: '#999' }}>
+                建立時間：{detail.createdAt ?? '-'}　建立者：{detail.createdBy ?? '-'}　異動時間：
+                {detail.updatedAt ?? '-'}　異動者：{detail.updatedBy ?? '-'}
+              </div>
+            )}
             <Form.Item style={{ marginBottom: 0 }}>
               <Space>
                 <Button type="primary" htmlType="submit" loading={submitting}>

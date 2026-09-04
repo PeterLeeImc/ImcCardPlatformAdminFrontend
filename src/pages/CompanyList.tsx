@@ -54,13 +54,12 @@ export default function CompanyList() {
     { title: '公司代碼', dataIndex: 'companyNum', key: 'companyNum' },
     { title: '公司名稱', dataIndex: 'chName', key: 'chName' },
     { title: '簡稱', dataIndex: 'name4Short', key: 'name4Short' },
-    { title: '電話', dataIndex: 'phone', key: 'phone' },
-    { title: 'Email', dataIndex: 'email', key: 'email' },
     {
       title: '操作',
       key: 'action',
       render: (_, record) => (
         <Space size="middle">
+          <a onClick={() => navigate(`/dispatch-cases?companyId=${record.id}`)}>派遣個案/班表</a>
           <a onClick={() => navigate(`/companies/${record.id}`)}>編輯</a>
           <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
             刪除

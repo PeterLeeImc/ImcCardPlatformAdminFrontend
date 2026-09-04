@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button, Form, Input, InputNumber, Layout, Modal, Select, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
-import type { CompanyListItem, LogPage, WebLeaveTypeItem, WebLeaveTypeUpdateRequest } from '../types'
+import type { CompanyListItem, DispatchCaseItem, LogPage, WebLeaveTypeItem, WebLeaveTypeUpdateRequest } from '../types'
 import { ANNUAL_EFFECTIVE_DATE_OPTIONS, EMPLOYEE_STYLE_OPTIONS, SET_MODE_OPTIONS } from '../types'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
@@ -12,6 +12,8 @@ export default function CompanyLeaveTypeList() {
   const navigate = useNavigate()
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [companyId, setCompanyId] = useState<number>()
+  const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
+  const [dispatchCaseId, setDispatchCaseId] = useState<number>()
   const [year, setYear] = useState(CURRENT_YEAR)
   const [rows, setRows] = useState<WebLeaveTypeItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -33,11 +35,25 @@ export default function CompanyLeaveTypeList() {
       .catch(() => message.error('載入公司清單失敗'))
   }, [])
 
+  useEffect(() => {
+    if (!companyId) return
+    apiClient
+      .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
+      .then((res) => {
+        setDispatchCases(res.data)
+        setDispatchCaseId(res.data.length > 0 ? res.data[0].id : undefined)
+      })
+      .catch(() => setDispatchCases([]))
+  }, [companyId])
+
   const fetchRows = () => {
-    if (!companyId || !year) return
+    if (!dispatchCaseId || !year) {
+      setRows([])
+      return
+    }
     setLoading(true)
     apiClient
-      .get<WebLeaveTypeItem[]>('/admin/company-leave-types', { params: { companyId, year } })
+      .get<WebLeaveTypeItem[]>('/admin/company-leave-types', { params: { dispatchCaseId, year } })
       .then((res) => setRows(res.data))
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
@@ -49,7 +65,7 @@ export default function CompanyLeaveTypeList() {
   useEffect(() => {
     fetchRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, year])
+  }, [dispatchCaseId, year])
 
   const addYear = async () => {
     setAddYearLoading(true)
@@ -66,10 +82,10 @@ export default function CompanyLeaveTypeList() {
   }
 
   const sync = async () => {
-    if (!companyId) return
+    if (!dispatchCaseId) return
     setSyncLoading(true)
     try {
-      const res = await apiClient.post('/admin/company-leave-types/sync', null, { params: { companyId, year } })
+      const res = await apiClient.post('/admin/company-leave-types/sync', null, { params: { dispatchCaseId, year } })
       message.success(res.data ?? '已同步員工假別')
     } catch (err) {
       const axiosErr = err as { response?: { data?: string } }
@@ -164,11 +180,18 @@ export default function CompanyLeaveTypeList() {
             onChange={setCompanyId}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
           />
+          <Select
+            style={{ width: 200 }}
+            placeholder="選擇派遣個案"
+            value={dispatchCaseId}
+            onChange={setDispatchCaseId}
+            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
+          />
           <Input style={{ width: 120 }} value={year} onChange={(e) => setYear(e.target.value)} placeholder="年度" />
           <Button loading={addYearLoading} onClick={addYear}>
             新增假別年度
           </Button>
-          <Button type="primary" loading={syncLoading} onClick={sync} disabled={!companyId}>
+          <Button type="primary" loading={syncLoading} onClick={sync} disabled={!dispatchCaseId}>
             同步員工假別
           </Button>
         </Space>

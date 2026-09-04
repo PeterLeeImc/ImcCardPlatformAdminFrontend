@@ -14,11 +14,11 @@ import {
   IdcardOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
-  ScheduleOutlined,
   TagsOutlined,
   FieldTimeOutlined,
   AppstoreOutlined,
   ImportOutlined,
+  ScheduleOutlined,
 } from '@ant-design/icons'
 import { clearSessionAndRedirectToLogin } from '../api/client'
 
@@ -52,16 +52,10 @@ export default function Home() {
       icon: <IdcardOutlined style={{ fontSize: 32 }} />,
     },
     {
-      key: '/departments',
-      label: '部門主檔',
-      desc: '公司部門與部門主管設定',
+      key: '/dispatch-cases',
+      label: '派遣個案',
+      desc: '公司底下的派遣個案清單、負責使用者、班表內容(同公司不同個案可各自設定班表)',
       icon: <ApartmentOutlined style={{ fontSize: 32 }} />,
-    },
-    {
-      key: '/time-schedules',
-      label: '班表內容',
-      desc: '公司班別代碼與上下班/午休時間',
-      icon: <ScheduleOutlined style={{ fontSize: 32 }} />,
     },
     {
       key: '/leave-types',
@@ -76,9 +70,15 @@ export default function Home() {
       icon: <FieldTimeOutlined style={{ fontSize: 32 }} />,
     },
     {
+      key: '/holidays',
+      label: '假日檔維護',
+      desc: '國定假日/公司行事曆主檔，可Excel批次匯出匯入',
+      icon: <ScheduleOutlined style={{ fontSize: 32 }} />,
+    },
+    {
       key: '/emp-schedule-calendar',
       label: '員工班段行事曆',
-      desc: '公司內任一員工的排班行事曆、調班、快速排班、Excel匯入',
+      desc: '派遣個案內任一員工的排班行事曆、調班、快速排班、Excel匯入',
       icon: <AppstoreOutlined style={{ fontSize: 32 }} />,
     },
     {

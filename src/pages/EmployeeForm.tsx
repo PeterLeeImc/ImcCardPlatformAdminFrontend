@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Checkbox, Form, Input, Layout, Modal, Select, Space, Spin, message } from 'antd'
 import { apiClient } from '../api/client'
-import type { ComDepartmentItem, EmployeeDetail, EmployeeUpsertRequest } from '../types'
+import type { DispatchCaseItem, EmployeeDetail, EmployeeUpsertRequest } from '../types'
 import { JOB_STATUS_OPTIONS, MARRIAGE_OPTIONS, ROLE_OPTIONS, SEX_OPTIONS } from '../types'
 
 interface EmployeeFormValues {
@@ -43,10 +43,10 @@ export default function EmployeeForm() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [detail, setDetail] = useState<EmployeeDetail>()
-  const [deptModalOpen, setDeptModalOpen] = useState(false)
-  const [departments, setDepartments] = useState<ComDepartmentItem[]>([])
-  const [deptChanging, setDeptChanging] = useState(false)
-  const [selectedDeptId, setSelectedDeptId] = useState<number>()
+  const [caseModalOpen, setCaseModalOpen] = useState(false)
+  const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
+  const [caseChanging, setCaseChanging] = useState(false)
+  const [selectedCaseId, setSelectedCaseId] = useState<number>()
 
   useEffect(() => {
     if (!isEdit) return
@@ -140,31 +140,31 @@ export default function EmployeeForm() {
     }
   }
 
-  const openDeptModal = () => {
+  const openCaseModal = () => {
     if (!detail?.companyId) return
     apiClient
-      .get<ComDepartmentItem[]>(`/admin/companies/${detail.companyId}/departments`)
-      .then((res) => setDepartments(res.data))
-      .catch(() => message.error('載入部門清單失敗'))
-    setSelectedDeptId(detail?.comDepartmentId ?? undefined)
-    setDeptModalOpen(true)
+      .get<DispatchCaseItem[]>(`/admin/companies/${detail.companyId}/dispatch-cases`)
+      .then((res) => setDispatchCases(res.data))
+      .catch(() => message.error('載入派遣個案清單失敗'))
+    setSelectedCaseId(detail?.dispatchCaseId ?? undefined)
+    setCaseModalOpen(true)
   }
 
-  const submitDeptChange = async () => {
-    if (!id || !selectedDeptId) return
-    setDeptChanging(true)
+  const submitCaseChange = async () => {
+    if (!id || !selectedCaseId) return
+    setCaseChanging(true)
     try {
-      const res = await apiClient.post<EmployeeDetail>(`/admin/employees/${id}/department`, {
-        comDepartmentId: selectedDeptId,
+      const res = await apiClient.post<EmployeeDetail>(`/admin/employees/${id}/dispatch-case`, {
+        dispatchCaseId: selectedCaseId,
       })
       setDetail(res.data)
-      message.success('已異動部門，簽核主管已自動更新')
-      setDeptModalOpen(false)
+      message.success('已異動派遣個案')
+      setCaseModalOpen(false)
     } catch (err) {
       const axiosErr = err as { response?: { data?: string } }
-      message.error(axiosErr.response?.data ?? '異動部門失敗')
+      message.error(axiosErr.response?.data ?? '異動派遣個案失敗')
     } finally {
-      setDeptChanging(false)
+      setCaseChanging(false)
     }
   }
 
@@ -190,13 +190,10 @@ export default function EmployeeForm() {
             <div style={{ marginBottom: 24, padding: 16, background: '#f5f6f8', borderRadius: 8 }}>
               <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 13, color: '#999' }}>目前部門</div>
-                  <div style={{ fontSize: 15, fontWeight: 600 }}>{detail?.departmentName ?? '未設定'}</div>
-                  <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-                    部門主管(departHeadNum)：{detail?.departHeadNum ?? '無'}
-                  </div>
+                  <div style={{ fontSize: 13, color: '#999' }}>目前派遣個案</div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>{detail?.dispatchCaseCode ?? '未設定'}</div>
                 </div>
-                <Button onClick={openDeptModal}>異動部門</Button>
+                <Button onClick={openCaseModal}>異動派遣個案</Button>
               </Space>
             </div>
           )}
@@ -279,14 +276,14 @@ export default function EmployeeForm() {
             </Space>
             <Form.Item
               name="chargeHeadNum"
-              label="第一層(先簽)簽核人員工編號"
-              tooltip="輸入另一位員工的員工編號，儲存後系統會自動查找、算出真正的直屬簽核主管"
+              label="簽核人員工編號"
+              tooltip="輸入另一位員工的員工編號，儲存後系統會自動查找、算出真正的簽核主管"
             >
               <Input placeholder="員工編號" />
             </Form.Item>
             {isEdit && detail?.realChargeHeadNum && (
               <div style={{ marginTop: -16, marginBottom: 16, fontSize: 12, color: '#999' }}>
-                目前算出的直屬簽核主管：{detail.realChargeHeadNum}
+                目前算出的簽核主管：{detail.realChargeHeadNum}
               </div>
             )}
             <Form.Item name="disabilityLevel" label="身心障礙等級">
@@ -313,22 +310,23 @@ export default function EmployeeForm() {
         </Spin>
       </div>
       <Modal
-        title="異動部門"
-        open={deptModalOpen}
-        onCancel={() => setDeptModalOpen(false)}
-        onOk={submitDeptChange}
-        confirmLoading={deptChanging}
+        title="異動派遣個案"
+        open={caseModalOpen}
+        onCancel={() => setCaseModalOpen(false)}
+        onOk={submitCaseChange}
+        confirmLoading={caseChanging}
         destroyOnHidden
       >
         <div style={{ marginBottom: 12, fontSize: 13, color: '#666' }}>
-          異動後會依角色規則自動更新這位員工的部門主管簽核人設定。
+          純粹記錄這位員工屬於哪個派遣個案(影響班表/假別規則選項)，不影響簽核設定；簽核人請在上方
+          「簽核人員工編號」欄位設定。
         </div>
         <Select
           style={{ width: '100%' }}
-          placeholder="選擇新部門"
-          value={selectedDeptId}
-          onChange={setSelectedDeptId}
-          options={departments.map((d) => ({ value: d.id, label: `${d.deptId} ${d.deptName}` }))}
+          placeholder="選擇新派遣個案"
+          value={selectedCaseId}
+          onChange={setSelectedCaseId}
+          options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
         />
       </Modal>
     </Layout>

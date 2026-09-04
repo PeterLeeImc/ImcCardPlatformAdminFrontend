@@ -13,13 +13,14 @@ import CompanyList from './pages/CompanyList'
 import CompanyForm from './pages/CompanyForm'
 import CompanyLeaveTypeList from './pages/CompanyLeaveTypeList'
 import EmployeeLeaveTypeList from './pages/EmployeeLeaveTypeList'
-import DepartmentList from './pages/DepartmentList'
+import DispatchCaseList from './pages/DispatchCaseList'
 import EmployeeList from './pages/EmployeeList'
 import EmployeeForm from './pages/EmployeeForm'
 import EmpDayCardList from './pages/EmpDayCardList'
 import AttendanceDetailReport from './pages/AttendanceDetailReport'
 import LeaveTypeList from './pages/LeaveTypeList'
 import WorkOvertimeList from './pages/WorkOvertimeList'
+import HolidayList from './pages/HolidayList'
 import ComTimeScheduleList from './pages/ComTimeScheduleList'
 import EmpScheduleCalendar from './pages/EmpScheduleCalendar'
 import BatchImport from './pages/BatchImport'
@@ -164,10 +165,10 @@ export default function App() {
           }
         />
         <Route
-          path="/departments"
+          path="/dispatch-cases"
           element={
             <RequireAuth>
-              <DepartmentList />
+              <DispatchCaseList />
             </RequireAuth>
           }
         />
@@ -228,7 +229,15 @@ export default function App() {
           }
         />
         <Route
-          path="/time-schedules"
+          path="/holidays"
+          element={
+            <RequireAuth>
+              <HolidayList />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/companies/:companyId/dispatch-cases/:dispatchCaseId/time-schedules"
           element={
             <RequireAuth>
               <ComTimeScheduleList />

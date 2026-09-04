@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
 import type {
   CompanyListItem,
+  DispatchCaseItem,
   LogPage,
   WebEmpLeaveTypeItem,
   WebEmpLeaveTypeUpdateRequest,
@@ -18,6 +19,8 @@ export default function EmployeeLeaveTypeList() {
   const navigate = useNavigate()
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [companyId, setCompanyId] = useState<number>()
+  const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
+  const [dispatchCaseId, setDispatchCaseId] = useState<number>()
   const [year, setYear] = useState(CURRENT_YEAR)
   const [leaveTypeId, setLeaveTypeId] = useState<number>()
   const [leaveTypeOptions, setLeaveTypeOptions] = useState<WebLeaveTypeItem[]>([])
@@ -41,12 +44,26 @@ export default function EmployeeLeaveTypeList() {
   }, [])
 
   useEffect(() => {
-    if (!companyId || !year) return
+    if (!companyId) return
     apiClient
-      .get<WebLeaveTypeItem[]>('/admin/company-leave-types', { params: { companyId, year } })
+      .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
+      .then((res) => {
+        setDispatchCases(res.data)
+        setDispatchCaseId(res.data.length > 0 ? res.data[0].id : undefined)
+      })
+      .catch(() => setDispatchCases([]))
+  }, [companyId])
+
+  useEffect(() => {
+    if (!dispatchCaseId || !year) {
+      setLeaveTypeOptions([])
+      return
+    }
+    apiClient
+      .get<WebLeaveTypeItem[]>('/admin/company-leave-types', { params: { dispatchCaseId, year } })
       .then((res) => setLeaveTypeOptions(res.data))
       .catch(() => setLeaveTypeOptions([]))
-  }, [companyId, year])
+  }, [dispatchCaseId, year])
 
   const fetchRows = (targetPage: number) => {
     if (!companyId || !year) return
@@ -141,6 +158,13 @@ export default function EmployeeLeaveTypeList() {
               setPage(0)
             }}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+          />
+          <Select
+            style={{ width: 200 }}
+            placeholder="選擇派遣個案(篩選假別選項)"
+            value={dispatchCaseId}
+            onChange={setDispatchCaseId}
+            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
           />
           <Input
             style={{ width: 120 }}

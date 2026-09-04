@@ -4,7 +4,7 @@ import { Button, DatePicker, Layout, Modal, Select, Space, Upload, message } fro
 import { LeftOutlined, RightOutlined, UploadOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { apiClient } from '../api/client'
-import type { CompanyListItem, LogPage } from '../types'
+import type { CompanyListItem, DispatchCaseItem, LogPage } from '../types'
 
 interface AdminEmployeeOption {
   id: number
@@ -57,6 +57,8 @@ export default function EmpScheduleCalendar() {
 
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [companyId, setCompanyId] = useState<number>()
+  const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
+  const [dispatchCaseId, setDispatchCaseId] = useState<number>()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [employees, setEmployees] = useState<AdminEmployeeOption[]>([])
@@ -101,23 +103,36 @@ export default function EmpScheduleCalendar() {
   useEffect(() => {
     if (!companyId) return
     apiClient
-      .get<AdminEmployeeOption[]>('/admin/schedules/employees', { params: { companyId } })
+      .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
+      .then((res) => {
+        setDispatchCases(res.data)
+        setDispatchCaseId(res.data.length > 0 ? res.data[0].id : undefined)
+      })
+      .catch(() => setDispatchCases([]))
+  }, [companyId])
+
+  const basePath = () => `/admin/companies/${companyId}/dispatch-cases/${dispatchCaseId}/schedules`
+
+  useEffect(() => {
+    if (!companyId || !dispatchCaseId) return
+    apiClient
+      .get<AdminEmployeeOption[]>(`${basePath()}/employees`)
       .then((res) => setEmployees(res.data))
       .catch(() => setEmployees([]))
     apiClient
-      .get<ShiftOption[]>(`/admin/companies/${companyId}/time-schedules`)
+      .get<ShiftOption[]>(`/admin/companies/${companyId}/dispatch-cases/${dispatchCaseId}/time-schedules`)
       .then((res) => setShiftOptions(res.data))
       .catch(() => setShiftOptions([]))
     setSelectedEmployeeId(ALL_EMPLOYEES)
-  }, [companyId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId, dispatchCaseId])
 
   const load = () => {
-    if (!companyId) return
+    if (!companyId || !dispatchCaseId) return
     setLoading(true)
     apiClient
-      .get<ScheduleDay[]>('/admin/schedules/calendar', {
+      .get<ScheduleDay[]>(`${basePath()}/calendar`, {
         params: {
-          companyId,
           year,
           month,
           employeeId: selectedEmployeeId === ALL_EMPLOYEES ? undefined : selectedEmployeeId,
@@ -134,7 +149,7 @@ export default function EmpScheduleCalendar() {
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, year, month, selectedEmployeeId])
+  }, [companyId, dispatchCaseId, year, month, selectedEmployeeId])
 
   const changeMonth = (diff: number) => {
     let m = month + diff
@@ -196,20 +211,16 @@ export default function EmpScheduleCalendar() {
   }
 
   const submitReschedule = async (force: boolean) => {
-    if (!editTarget || !editShiftId || !companyId) return
+    if (!editTarget || !editShiftId || !companyId || !dispatchCaseId) return
     setSaving(true)
     try {
-      await apiClient.post(
-        '/admin/schedules/reschedule',
-        {
-          employeeId: editTarget.employeeId,
-          originalDate: editTarget.date,
-          newDate: formatDate(editDate),
-          comTimeScheduleId: editShiftId,
-          forceOverwrite: force,
-        },
-        { params: { companyId } },
-      )
+      await apiClient.post(`${basePath()}/reschedule`, {
+        employeeId: editTarget.employeeId,
+        originalDate: editTarget.date,
+        newDate: formatDate(editDate),
+        comTimeScheduleId: editShiftId,
+        forceOverwrite: force,
+      })
       message.success('調班成功')
       setEditTarget(undefined)
       load()
@@ -231,10 +242,10 @@ export default function EmpScheduleCalendar() {
   }
 
   const downloadTemplate = async () => {
-    if (!companyId) return
+    if (!companyId || !dispatchCaseId) return
     try {
-      const res = await apiClient.get('/admin/schedules/import-template', {
-        params: { companyId, year, month },
+      const res = await apiClient.get(`${basePath()}/import-template`, {
+        params: { year, month },
         responseType: 'blob',
       })
       const url = URL.createObjectURL(res.data as Blob)
@@ -251,13 +262,13 @@ export default function EmpScheduleCalendar() {
   }
 
   const runImport = async () => {
-    if (!importFile || !companyId) return
+    if (!importFile || !companyId || !dispatchCaseId) return
     setImporting(true)
     setImportErrors([])
     try {
       const formData = new FormData()
       formData.append('file', importFile)
-      const res = await apiClient.post('/admin/schedules/import', formData, { params: { companyId, year, month } })
+      const res = await apiClient.post(`${basePath()}/import`, formData, { params: { year, month } })
       const data = res.data as { successCount: number; errors: string[] }
       if (data.errors && data.errors.length > 0) {
         setImportErrors(data.errors)
@@ -315,22 +326,18 @@ export default function EmpScheduleCalendar() {
   const quickTodayKey = formatDate(today)
 
   const submitQuickAssign = async (force: boolean) => {
-    if (!quickEmployeeId || !quickShiftId || quickDates.size === 0 || !companyId) {
+    if (!quickEmployeeId || !quickShiftId || quickDates.size === 0 || !companyId || !dispatchCaseId) {
       message.error('請選擇員工、班別，並至少勾選一天')
       return
     }
     setQuickSaving(true)
     try {
-      await apiClient.post(
-        '/admin/schedules/quick-assign',
-        {
-          employeeId: quickEmployeeId,
-          dates: Array.from(quickDates),
-          comTimeScheduleId: quickShiftId,
-          forceOverwrite: force,
-        },
-        { params: { companyId } },
-      )
+      await apiClient.post(`${basePath()}/quick-assign`, {
+        employeeId: quickEmployeeId,
+        dates: Array.from(quickDates),
+        comTimeScheduleId: quickShiftId,
+        forceOverwrite: force,
+      })
       message.success('快速排班成功')
       setQuickOpen(false)
       load()
@@ -367,7 +374,7 @@ export default function EmpScheduleCalendar() {
           <a onClick={() => navigate('/')}>首頁</a>
           <span style={{ fontSize: 18, fontWeight: 600 }}>員工班段行事曆</span>
         </Space>
-        <Button onClick={openQuickAssign} disabled={!companyId}>
+        <Button onClick={openQuickAssign} disabled={!dispatchCaseId}>
           快速排班
         </Button>
       </div>
@@ -379,6 +386,13 @@ export default function EmpScheduleCalendar() {
             value={companyId}
             onChange={setCompanyId}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+          />
+          <Select
+            style={{ width: 200 }}
+            placeholder="選擇派遣個案"
+            value={dispatchCaseId}
+            onChange={setDispatchCaseId}
+            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
           />
           <Select
             style={{ width: 200 }}
@@ -483,7 +497,7 @@ export default function EmpScheduleCalendar() {
             下載範本(會回填這家公司目前該月排班) → 編輯Excel → 選檔上傳 → 執行匯入
           </div>
           <Space wrap style={{ marginBottom: 12 }}>
-            <Button onClick={downloadTemplate} disabled={!companyId}>
+            <Button onClick={downloadTemplate} disabled={!dispatchCaseId}>
               下載範本
             </Button>
             <Upload

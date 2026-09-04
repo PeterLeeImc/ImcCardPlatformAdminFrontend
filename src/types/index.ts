@@ -125,43 +125,31 @@ export interface CompanyListItem {
   companyNum: string
   chName: string
   name4Short: string
-  phone: string | null
-  email: string | null
 }
 
 export interface CompanyDetail {
   id: number
   companyNum: string
   chName: string
-  enName: string | null
   name4Short: string
   uniformNum: string
-  nation: string
-  phone: string | null
-  fax: string | null
-  addrZipCode: string | null
   addr: string | null
-  website: string | null
-  email: string | null
   latitude: number | null
   longitude: number | null
   punchMethod: string | null
   gpsRadiusMeters: number | null
+  createdAt: string | null
+  createdBy: string | null
+  updatedAt: string | null
+  updatedBy: string | null
 }
 
 export interface CompanyCreateRequest {
   companyNum: string
   chName: string
-  enName?: string
   name4Short: string
   uniformNum: string
-  nation: string
-  phone?: string
-  fax?: string
-  addrZipCode?: string
   addr?: string
-  website?: string
-  email?: string
   latitude?: number
   longitude?: number
   punchMethod?: string
@@ -251,20 +239,30 @@ export const ANNUAL_EFFECTIVE_DATE_OPTIONS = [
   { value: '003', label: '每年第一天' },
 ]
 
-// 公司部門主檔 / 員工維護
+// 派遣個案 / 員工維護
 
-export interface ComDepartmentItem {
+export interface DispatchCaseItem {
   id: number
-  deptId: string
-  deptName: string
-  managerId: number | null
-  managerName: string | null
+  caseCode: string
+  responsibleUserId: number | null
+  responsibleUserName: string | null
+  defaultOvertimeChangeToCompTime: boolean
+  createdAt: string | null
+  createdBy: string | null
+  updatedAt: string | null
+  updatedBy: string | null
 }
 
-export interface ComDepartmentUpsertRequest {
-  deptId: string
-  deptName: string
-  managerId?: number | null
+export interface DispatchCaseUpsertRequest {
+  caseCode: string
+  responsibleUserId?: number | null
+  defaultOvertimeChangeToCompTime: boolean
+}
+
+export interface ManagerOption {
+  id: number
+  account: string
+  username: string
 }
 
 // 假別維護 (leave type master)
@@ -340,7 +338,7 @@ export interface EmployeeListItem {
   roleLabel: string
   jobStatus: string | null
   jobStatusLabel: string | null
-  departmentName: string | null
+  dispatchCaseCode: string | null
 }
 
 export interface EmployeeDetail {
@@ -351,8 +349,8 @@ export interface EmployeeDetail {
   role: string
   idNum: string
   companyId: number | null
-  comDepartmentId: number | null
-  departmentName: string | null
+  dispatchCaseId: number | null
+  dispatchCaseCode: string | null
   nation: string | null
   birthday: string | null
   sex: string | null
@@ -372,7 +370,6 @@ export interface EmployeeDetail {
   cardDataFrom: string | null
   chargeHeadNum: string | null
   realChargeHeadNum: string | null
-  departHeadNum: string | null
   disabilityLevel: string | null
   overtimePay: number | null
   leaveAttachment: number | null
@@ -385,7 +382,6 @@ export interface EmployeeUpsertRequest {
   enname: string
   role: string
   idNum: string
-  comDepartmentId?: number
   nation?: string
   birthday?: string
   sex?: string
@@ -426,6 +422,23 @@ export const JOB_STATUS_OPTIONS = [
   { value: '002', label: '離職' },
   { value: '003', label: '留職停薪' },
 ]
+
+// 假日檔維護 (holidays)
+
+export interface HolidayItem {
+  id: number
+  day: string
+  explain: string
+  createdAt: string | null
+  createdBy: string | null
+  updatedAt: string | null
+  updatedBy: string | null
+}
+
+export interface HolidayUpsertRequest {
+  day: string
+  explain: string
+}
 
 // 員工每日打卡
 
