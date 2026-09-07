@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Form, Input, InputNumber, Layout, Select, Space, Spin, message } from 'antd'
-import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet'
+import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { apiClient } from '../api/client'
 import type { CompanyCreateRequest, CompanyDetail, CompanyUpdateRequest } from '../types'
 import { PUNCH_METHOD_OPTIONS } from '../types'
+import { formatDateTime } from '../utils/formatDateTime'
+import { shortenAddressCandidates } from '../utils/shortenAddressCandidates'
 
 const DEFAULT_CENTER: [number, number] = [23.9739, 120.9797] // 台灣中心點，還沒有座標時的預設地圖中心
 
@@ -25,45 +27,24 @@ interface CompanyFormValues {
   companyNum: string
   chName: string
   name4Short: string
-  uniformNum: string
   addr: string
   punchMethod: string
   gpsRadiusMeters: number
 }
 
 /**
- * 依序砍掉地址尾端的樓層/門牌/巷弄/段等細節，回傳由細到粗的候選地址清單。
- * 例如"台北市松山區敦化南路一段2號10樓"查不到座標時，改試"...2號"、"...一段"，
- * 用來讓查無座標時能自動退而求其次找到大致位置。
+ * 地圖視角跟著pendingPosition/savedPosition移動：react-leaflet的MapContainer的center prop
+ * 只在初次掛載時生效，之後改變不會自動移動視角，地址轉座標查到新位置、或套用/清除pending座標時，
+ * 都要靠這個元件手動呼叫map.setView()把視角帶過去，否則新標出的紅點可能在畫面外看不到。
  */
-function shortenAddressCandidates(addr: string): string[] {
-  const candidates = [addr]
-  let current = addr
-  const patterns = [
-    /之[\d]+$/, // 之5(樓層房號後綴，如10樓之5)
-    /[\d]+樓$/, // 10樓
-    /[\d]+室$/, // X室
-    /[\d]+號$/, // 2號
-    /[\d]+弄$/, // X弄
-    /[\d]+巷$/, // X巷
-    /[〇零一二三四五六七八九十百千\d]+段$/, // 一段
-  ]
-  // 每輪只套用第一個命中的pattern就重新開始，讓「之5」「10樓」這類疊加的尾端單位能逐一剝除，
-  // 而不是每個pattern只各自套用一次(否則"之5"擋住後面的"樓"pattern永遠match不到)。
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const pattern of patterns) {
-      const next = current.replace(pattern, '').trim()
-      if (next !== current && next.length > 0) {
-        candidates.push(next)
-        current = next
-        changed = true
-        break
-      }
+function MapFlyTo({ position }: { position: [number, number] | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (position) {
+      map.setView(position, Math.max(map.getZoom(), 16))
     }
-  }
-  return candidates
+  }, [position, map])
+  return null
 }
 
 /**
@@ -117,7 +98,6 @@ export default function CompanyForm() {
           companyNum: d.companyNum,
           chName: d.chName,
           name4Short: d.name4Short,
-          uniformNum: d.uniformNum,
           addr: d.addr ?? '',
           punchMethod: d.punchMethod ?? 'GPS',
           gpsRadiusMeters: d.gpsRadiusMeters ?? 200,
@@ -128,7 +108,7 @@ export default function CompanyForm() {
       })
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
-        message.error(axiosErr.response?.data ?? '載入公司資料失敗')
+        message.error(axiosErr.response?.data ?? '載入客戶資料失敗')
       })
       .finally(() => setLoading(false))
   }, [id, isEdit, form])
@@ -182,7 +162,6 @@ export default function CompanyForm() {
       const base = {
         chName: values.chName,
         name4Short: values.name4Short,
-        uniformNum: values.uniformNum,
         addr: values.addr || undefined,
         latitude: savedPosition?.[0],
         longitude: savedPosition?.[1],
@@ -192,11 +171,11 @@ export default function CompanyForm() {
       if (isEdit) {
         const body: CompanyUpdateRequest = base
         await apiClient.put(`/admin/companies/${id}`, body)
-        message.success('已更新公司')
+        message.success('已更新客戶')
       } else {
         const body: CompanyCreateRequest = { ...base, companyNum: values.companyNum }
         await apiClient.post('/admin/companies', body)
-        message.success('已新增公司')
+        message.success('已新增客戶')
       }
       navigate('/companies')
     } catch (err) {
@@ -222,10 +201,10 @@ export default function CompanyForm() {
         }}
       >
         <Space>
-          <a onClick={() => navigate('/companies')}>公司維護</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>{isEdit ? '編輯公司' : '新增公司'}</span>
+          <a onClick={() => navigate('/companies')}>客戶維護</a>
+          <span style={{ fontSize: 18, fontWeight: 600 }}>{isEdit ? '編輯客戶' : '新增客戶'}</span>
         </Space>
-        {isEdit && <a onClick={() => navigate(`/dispatch-cases?companyId=${id}`)}>前往派遣個案 / 班表 →</a>}
+        {isEdit && <a onClick={() => navigate(`/dispatch-cases?companyId=${id}`)}>前往個案維護 / 班表 →</a>}
       </div>
       <div style={{ maxWidth: 720, margin: '32px auto', width: '100%', background: '#fff', borderRadius: 12, padding: 32 }}>
         <Spin spinning={loading}>
@@ -236,26 +215,30 @@ export default function CompanyForm() {
             initialValues={{ punchMethod: 'GPS', gpsRadiusMeters: 200 }}
           >
             {isEdit ? (
-              <Form.Item label="公司代碼">
+              <Form.Item label="客戶編號" tooltip="IMC客戶編號">
                 <Input value={detail?.companyNum} disabled />
               </Form.Item>
             ) : (
-              <Form.Item name="companyNum" label="公司代碼" rules={[{ required: true, message: '請輸入公司代碼' }]}>
-                <Input placeholder="公司代碼" />
+              <Form.Item
+                name="companyNum"
+                label="客戶編號"
+                tooltip="IMC客戶編號"
+                rules={[{ required: true, message: '請輸入客戶編號' }]}
+              >
+                <Input placeholder="客戶編號" />
               </Form.Item>
             )}
             <Form.Item name="chName" label="中文名稱" rules={[{ required: true, message: '請輸入中文名稱' }]}>
               <Input placeholder="中文名稱" />
             </Form.Item>
-            <Form.Item name="name4Short" label="公司簡稱" rules={[{ required: true, message: '請輸入公司簡稱' }]}>
-              <Input placeholder="公司簡稱" />
+            <Form.Item name="name4Short" label="客戶簡稱" rules={[{ required: true, message: '請輸入客戶簡稱' }]}>
+              <Input placeholder="客戶簡稱" />
             </Form.Item>
-            <Form.Item name="uniformNum" label="統一編號" rules={[{ required: true, message: '請輸入統一編號' }]}>
-              <Input placeholder="統一編號" />
-            </Form.Item>
-            <Form.Item name="addr" label="地址">
+            <Form.Item label="地址">
               <Space.Compact style={{ width: '100%' }}>
-                <Input placeholder="地址" />
+                <Form.Item name="addr" noStyle>
+                  <Input placeholder="地址" />
+                </Form.Item>
                 <Button loading={geocoding} onClick={geocodeAddress}>
                   地址轉座標
                 </Button>
@@ -286,6 +269,7 @@ export default function CompanyForm() {
                   pendingPosition={pendingPosition}
                   onPick={(lat, lng) => setPendingPosition([lat, lng])}
                 />
+                <MapFlyTo position={pendingPosition ?? savedPosition} />
               </MapContainer>
               {pendingPosition && (
                 <div style={{ marginTop: 8 }}>
@@ -300,8 +284,8 @@ export default function CompanyForm() {
             </Form.Item>
             {isEdit && detail && (
               <div style={{ marginBottom: 16, fontSize: 12, color: '#999' }}>
-                建立時間：{detail.createdAt ?? '-'}　建立者：{detail.createdBy ?? '-'}　異動時間：
-                {detail.updatedAt ?? '-'}　異動者：{detail.updatedBy ?? '-'}
+                建立時間：{formatDateTime(detail.createdAt)}　建立者：{detail.createdBy ?? '-'}　異動時間：
+                {formatDateTime(detail.updatedAt)}　異動者：{detail.updatedBy ?? '-'}
               </div>
             )}
             <Form.Item style={{ marginBottom: 0 }}>

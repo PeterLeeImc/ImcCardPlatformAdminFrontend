@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Form, Input, InputNumber, Layout, Modal, Select, Space, Table, message } from 'antd'
+import { Button, DatePicker, Form, Input, InputNumber, Layout, Modal, Select, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import dayjs from 'dayjs'
 import { apiClient } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, LogPage, WebLeaveTypeItem, WebLeaveTypeUpdateRequest } from '../types'
-import { ANNUAL_EFFECTIVE_DATE_OPTIONS, EMPLOYEE_STYLE_OPTIONS, SET_MODE_OPTIONS } from '../types'
+import { ANNUAL_EFFECTIVE_DATE_OPTIONS, SET_MODE_OPTIONS } from '../types'
+import { formatDate } from '../utils/formatDate'
+import { formatDateTime } from '../utils/formatDateTime'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
+const DATE_FORMAT = 'YYYY/MM/DD'
+const WIRE_DATE_FORMAT = 'YYYY-MM-DD'
 
 export default function CompanyLeaveTypeList() {
   const navigate = useNavigate()
@@ -21,7 +26,10 @@ export default function CompanyLeaveTypeList() {
   const [syncLoading, setSyncLoading] = useState(false)
   const [editing, setEditing] = useState<WebLeaveTypeItem>()
   const [saving, setSaving] = useState(false)
-  const [form] = Form.useForm<WebLeaveTypeUpdateRequest>()
+  const [form] = Form.useForm<Omit<WebLeaveTypeUpdateRequest, 'startDate' | 'endDate'> & {
+    startDate: dayjs.Dayjs | null
+    endDate: dayjs.Dayjs | null
+  }>()
 
   useEffect(() => {
     apiClient
@@ -32,7 +40,7 @@ export default function CompanyLeaveTypeList() {
           setCompanyId(res.data.content[0].id)
         }
       })
-      .catch(() => message.error('載入公司清單失敗'))
+      .catch(() => message.error('載入客戶清單失敗'))
   }, [])
 
   useEffect(() => {
@@ -98,14 +106,12 @@ export default function CompanyLeaveTypeList() {
   const openEdit = (row: WebLeaveTypeItem) => {
     setEditing(row)
     form.setFieldsValue({
-      startDate: row.startDate,
-      endDate: row.endDate,
+      startDate: row.startDate ? dayjs(row.startDate) : null,
+      endDate: row.endDate ? dayjs(row.endDate) : null,
       setMode: row.setMode,
       useTime: row.useTime,
       defaultHours: row.defaultHours,
       jobWorkDay: row.jobWorkDay,
-      employeeStyle: row.employeeStyle,
-      useCode: row.useCode,
       annualEffectiveDate: row.annualEffectiveDate,
       accumulatingLeaveType: row.accumulatingLeaveType,
     })
@@ -116,7 +122,12 @@ export default function CompanyLeaveTypeList() {
     try {
       const values = await form.validateFields()
       setSaving(true)
-      await apiClient.put(`/admin/company-leave-types/${editing.id}`, values)
+      const body: WebLeaveTypeUpdateRequest = {
+        ...values,
+        startDate: values.startDate ? values.startDate.format(WIRE_DATE_FORMAT) : null,
+        endDate: values.endDate ? values.endDate.format(WIRE_DATE_FORMAT) : null,
+      }
+      await apiClient.put(`/admin/company-leave-types/${editing.id}`, body)
       message.success('已更新')
       setEditing(undefined)
       fetchRows()
@@ -131,8 +142,8 @@ export default function CompanyLeaveTypeList() {
 
   const columns: ColumnsType<WebLeaveTypeItem> = [
     { title: '假別', dataIndex: 'leaveTypeName', key: 'leaveTypeName' },
-    { title: '起日', dataIndex: 'startDate', key: 'startDate' },
-    { title: '迄日', dataIndex: 'endDate', key: 'endDate' },
+    { title: '起日', dataIndex: 'startDate', key: 'startDate', render: formatDate },
+    { title: '迄日', dataIndex: 'endDate', key: 'endDate', render: formatDate },
     {
       title: '設定方式',
       dataIndex: 'setMode',
@@ -141,12 +152,6 @@ export default function CompanyLeaveTypeList() {
     },
     { title: '預設時數', dataIndex: 'defaultHours', key: 'defaultHours' },
     { title: '到職滿(天)', dataIndex: 'jobWorkDay', key: 'jobWorkDay' },
-    {
-      title: '員工類型',
-      dataIndex: 'employeeStyle',
-      key: 'employeeStyle',
-      render: (v: string) => EMPLOYEE_STYLE_OPTIONS.find((o) => o.value === v)?.label ?? v,
-    },
     {
       title: '操作',
       key: 'action',
@@ -168,18 +173,20 @@ export default function CompanyLeaveTypeList() {
       >
         <Space>
           <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>公司配假維護</span>
+          <span style={{ fontSize: 18, fontWeight: 600 }}>客戶配假設定</span>
         </Space>
       </div>
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
+          <span>選擇客戶：</span>
           <Select
             style={{ width: 240 }}
-            placeholder="選擇公司"
+            placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
           />
+          <span>選擇派遣個案：</span>
           <Select
             style={{ width: 200 }}
             placeholder="選擇派遣個案"
@@ -208,11 +215,11 @@ export default function CompanyLeaveTypeList() {
       >
         <Form form={form} layout="vertical">
           <Space style={{ width: '100%' }}>
-            <Form.Item name="startDate" label="起日(yyyy-MM-dd)">
-              <Input placeholder="2026-01-01" />
+            <Form.Item name="startDate" label="起日">
+              <DatePicker format={DATE_FORMAT} />
             </Form.Item>
-            <Form.Item name="endDate" label="迄日(yyyy-MM-dd)">
-              <Input placeholder="2026-12-31" />
+            <Form.Item name="endDate" label="迄日">
+              <DatePicker format={DATE_FORMAT} />
             </Form.Item>
           </Space>
           <Form.Item name="setMode" label="設定方式">
@@ -224,16 +231,16 @@ export default function CompanyLeaveTypeList() {
           <Form.Item name="jobWorkDay" label="到職滿幾天才適用">
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="employeeStyle" label="適用員工類型">
-            <Select options={EMPLOYEE_STYLE_OPTIONS} allowClear />
-          </Form.Item>
           <Form.Item name="annualEffectiveDate" label="年假生效日規則">
             <Select options={ANNUAL_EFFECTIVE_DATE_OPTIONS} allowClear />
           </Form.Item>
-          <Form.Item name="useCode" label="用途代碼">
-            <Input />
-          </Form.Item>
         </Form>
+        {editing && (
+          <div style={{ fontSize: 12, color: '#999' }}>
+            建立時間：{formatDateTime(editing.createdAt)}　建立者：{editing.createdBy ?? '-'}　異動時間：
+            {formatDateTime(editing.updatedAt)}　異動者：{editing.updatedBy ?? '-'}
+          </div>
+        )}
       </Modal>
     </Layout>
   )

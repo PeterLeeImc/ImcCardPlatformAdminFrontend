@@ -5,24 +5,73 @@ import type { MenuProps } from 'antd'
 import { apiClient } from '../api/client'
 import type { RightDto, RoleDto, RoleRightsDto } from '../types'
 
+const BACKOFFICE_MODULE = '後台作業'
+const PUNCH_MODULE = '打卡作業'
+
+/**
+ * 「角色功能」畫面照系統管理者首頁(Home.tsx)的三層分區重新分組/排序，取代原本單純依rightName
+ * 開頭模組前綴("維護作業"/"設定作業"/"後台系統作業"/"打卡RWD")自動分組的做法——那樣分出來的
+ * 群組跟首頁實際看到的功能分區對不起來，管理者不容易對照。這裡改成：首頁三層(藍/綠/黃)出現過的
+ * 功能全部歸在"後台作業"底下、依首頁三層的順序排列；其餘維持"打卡RWD"前綴的打卡RWD員工端專屬功能
+ * (打卡/請假/加班/簽核/補卡/班段行事曆/團隊班段行事曆)歸在"打卡作業"底下——這是這個畫面顯示分組用，
+ * rightName字串本身(含資料庫rights表、後端各controller的權限比對字串、打卡RWD前端讀取權限選單的
+ * 程式碼)大部分維持不動，只有這個畫面看到的標題/分組/順序改變；唯一例外是「通知」，管理端廣播
+ * 跟打卡RWD員工端點對點通知原本共用同一個right("打卡RWD|通知")沒辦法分開設定，已經拆成兩個獨立
+ * right："維護作業|通知廣播"(管理端，歸在這裡的後台作業/綠色列)跟"打卡RWD|收發通知"(打卡RWD員工端，
+ * 歸在打卡作業)，見AdminNotificationController/AuthController.RIGHT_NAME_TO_KEY的說明。
+ *
+ * TIER_ROWS對照首頁三層的背景色(見Home.tsx的tiers)，同一個rightName如果被首頁兩個入口共用
+ * (例如"派遣個案"和"員工維護"都對應"維護作業|員工維護")只會在第一次出現的位置顯示一次。
+ */
+const TIER_ROWS: { background: string; rightNames: string[] }[] = [
+  {
+    background: '#e6f4ff',
+    rightNames: [
+      '維護作業|客戶維護',
+      '維護作業|員工維護',
+      '設定作業|假別維護',
+      '維護作業|客戶配假設定',
+      '維護作業|員工配假設定',
+      '設定作業|加班別維護',
+    ],
+  },
+  {
+    background: '#f0f9e8',
+    rightNames: ['維護作業|員工班段行事曆', '維護作業|員工每日打卡', '維護作業|出勤明細報表', '維護作業|通知廣播'],
+  },
+  {
+    background: '#fffbe6',
+    rightNames: [
+      '後台系統作業|使用者維護',
+      '後台系統作業|角色功能',
+      '設定作業|假日檔維護',
+      '維護作業|多客戶班表匯入',
+      '打卡RWD|操作紀錄',
+      '打卡RWD|登入紀錄',
+    ],
+  },
+]
+
+const BACKOFFICE_ORDER = TIER_ROWS.flatMap((tier) => tier.rightNames)
+
 interface RightGroup {
   module: string
   rights: RightDto[]
 }
 
 function groupRights(rights: RightDto[]): RightGroup[] {
-  const groups = new Map<string, RightDto[]>()
-  for (const right of rights) {
-    const separatorIndex = right.rightName.indexOf('|')
-    const module = separatorIndex === -1 ? right.rightName : right.rightName.slice(0, separatorIndex)
-    const list = groups.get(module)
-    if (list) {
-      list.push(right)
-    } else {
-      groups.set(module, [right])
-    }
+  const byName = new Map(rights.map((r) => [r.rightName, r]))
+  const backoffice = BACKOFFICE_ORDER.map((name) => byName.get(name)).filter((r): r is RightDto => r != null)
+  const backofficeIds = new Set(backoffice.map((r) => r.id))
+  const punch = rights.filter((r) => !backofficeIds.has(r.id))
+  const result: RightGroup[] = []
+  if (backoffice.length > 0) {
+    result.push({ module: BACKOFFICE_MODULE, rights: backoffice })
   }
-  return Array.from(groups.entries()).map(([module, groupRightsList]) => ({ module, rights: groupRightsList }))
+  if (punch.length > 0) {
+    result.push({ module: PUNCH_MODULE, rights: punch })
+  }
+  return result
 }
 
 function rightLabel(right: RightDto): string {
@@ -80,6 +129,7 @@ export default function RoleRightsMatrix() {
   }, [selectedRoleId, loadGrants])
 
   const groups = useMemo(() => groupRights(rights), [rights])
+  const rightsById = useMemo(() => new Map(rights.map((r) => [r.rightName, r])), [rights])
 
   const toggleRight = (rightId: number, checked: boolean) => {
     setCheckedIds((prev) => {
@@ -109,6 +159,16 @@ export default function RoleRightsMatrix() {
   }
 
   const menuItems: MenuProps['items'] = roles.map((role) => ({ key: String(role.id), label: role.roleName }))
+
+  const renderCheckbox = (right: RightDto) => (
+    <Checkbox
+      key={right.id}
+      checked={checkedIds.has(right.id)}
+      onChange={(e) => toggleRight(right.id, e.target.checked)}
+    >
+      {rightLabel(right)}
+    </Checkbox>
+  )
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
@@ -150,19 +210,38 @@ export default function RoleRightsMatrix() {
                   items={groups.map((group) => ({
                     key: group.module,
                     label: group.module,
-                    children: (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
-                        {group.rights.map((right) => (
-                          <Checkbox
-                            key={right.id}
-                            checked={checkedIds.has(right.id)}
-                            onChange={(e) => toggleRight(right.id, e.target.checked)}
-                          >
-                            {rightLabel(right)}
-                          </Checkbox>
-                        ))}
-                      </div>
-                    ),
+                    children:
+                      group.module === BACKOFFICE_MODULE ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {TIER_ROWS.map((tier, tierIndex) => {
+                            const tierRights = tier.rightNames
+                              .map((name) => rightsById.get(name))
+                              .filter((r): r is RightDto => r != null)
+                            if (tierRights.length === 0) {
+                              return null
+                            }
+                            return (
+                              <div
+                                key={tierIndex}
+                                style={{
+                                  background: tier.background,
+                                  borderRadius: 8,
+                                  padding: 12,
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: '8px 24px',
+                                }}
+                              >
+                                {tierRights.map(renderCheckbox)}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
+                          {group.rights.map(renderCheckbox)}
+                        </div>
+                      ),
                   }))}
                 />
               )}

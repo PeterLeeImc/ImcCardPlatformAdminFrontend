@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Form, Input, Layout, Modal, Select, Space, Switch, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { apiClient } from '../api/client'
+import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, DispatchCaseUpsertRequest, LogPage, ManagerOption } from '../types'
+import { formatDateTime } from '../utils/formatDateTime'
 
 export default function DispatchCaseList() {
   const navigate = useNavigate()
@@ -29,7 +30,7 @@ export default function DispatchCaseList() {
           setCompanyId(res.data.content[0].id)
         }
       })
-      .catch(() => message.error('載入公司清單失敗'))
+      .catch(() => message.error('載入客戶清單失敗'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -41,7 +42,7 @@ export default function DispatchCaseList() {
       .then((res) => setRows(res.data))
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
-        message.error(axiosErr.response?.data ?? '載入派遣個案清單失敗')
+        message.error(axiosErr.response?.data ?? '載入個案清單失敗')
       })
       .finally(() => setLoading(false))
   }
@@ -77,10 +78,10 @@ export default function DispatchCaseList() {
       setSaving(true)
       if (editing === 'new') {
         await apiClient.post(`/admin/companies/${companyId}/dispatch-cases`, values)
-        message.success('已新增派遣個案')
+        message.success('已新增個案')
       } else {
         await apiClient.put(`/admin/companies/${companyId}/dispatch-cases/${editing.id}`, values)
-        message.success('已更新派遣個案')
+        message.success('已更新個案')
       }
       setEditing(undefined)
       fetchRows()
@@ -96,8 +97,8 @@ export default function DispatchCaseList() {
   const handleDelete = (row: DispatchCaseItem) => {
     if (!companyId) return
     Modal.confirm({
-      title: '確定要刪除這個派遣個案？',
-      content: `個案代碼：${row.caseCode}`,
+      title: '確定要刪除這個個案？',
+      content: `個案編號：${row.caseCode}`,
       okType: 'danger',
       onOk: async () => {
         try {
@@ -113,7 +114,7 @@ export default function DispatchCaseList() {
   }
 
   const columns: ColumnsType<DispatchCaseItem> = [
-    { title: '個案代碼', dataIndex: 'caseCode', key: 'caseCode' },
+    { title: '個案編號', dataIndex: 'caseCode', key: 'caseCode' },
     { title: '負責使用者', dataIndex: 'responsibleUserName', key: 'responsibleUserName' },
     {
       title: '加班預設換算',
@@ -121,9 +122,9 @@ export default function DispatchCaseList() {
       key: 'defaultOvertimeChangeToCompTime',
       render: (v: boolean) => (v ? '補休' : '加班費(現金)'),
     },
-    { title: '建立時間', dataIndex: 'createdAt', key: 'createdAt' },
+    { title: '建立時間', dataIndex: 'createdAt', key: 'createdAt', render: formatDateTime },
     { title: '建立者', dataIndex: 'createdBy', key: 'createdBy' },
-    { title: '異動時間', dataIndex: 'updatedAt', key: 'updatedAt' },
+    { title: '異動時間', dataIndex: 'updatedAt', key: 'updatedAt', render: formatDateTime },
     { title: '異動者', dataIndex: 'updatedBy', key: 'updatedBy' },
     {
       title: '操作',
@@ -131,6 +132,7 @@ export default function DispatchCaseList() {
       render: (_, record) => (
         <Space>
           <a onClick={() => navigate(`/companies/${companyId}/dispatch-cases/${record.id}/time-schedules`)}>班表</a>
+          <a onClick={() => navigate(`/employees?companyId=${companyId}&dispatchCaseId=${record.id}`)}>員工</a>
           <a onClick={() => openEdit(record)}>編輯</a>
           <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
             刪除
@@ -154,17 +156,18 @@ export default function DispatchCaseList() {
       >
         <Space>
           <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>派遣個案</span>
+          <span style={{ fontSize: 18, fontWeight: 600 }}>個案維護</span>
         </Space>
-        <Button type="primary" onClick={() => openEdit('new')} disabled={!companyId}>
-          新增派遣個案
+        <Button type="primary" onClick={() => openEdit('new')} disabled={!companyId || isAdvisorRole()}>
+          新增個案
         </Button>
       </div>
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }}>
+          <span>選擇客戶：</span>
           <Select
             style={{ width: 240 }}
-            placeholder="選擇公司"
+            placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
@@ -173,7 +176,7 @@ export default function DispatchCaseList() {
         <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
       </div>
       <Modal
-        title={editing === 'new' ? '新增派遣個案' : '編輯派遣個案'}
+        title={editing === 'new' ? '新增個案' : '編輯個案'}
         open={!!editing}
         onCancel={() => setEditing(undefined)}
         onOk={submitEdit}
@@ -181,7 +184,7 @@ export default function DispatchCaseList() {
         destroyOnHidden
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="caseCode" label="個案代碼" rules={[{ required: true, message: '請輸入個案代碼' }]}>
+          <Form.Item name="caseCode" label="個案編號" tooltip="IMC個案編號" rules={[{ required: true, message: '請輸入個案編號' }]}>
             <Input />
           </Form.Item>
           <Form.Item name="responsibleUserId" label="負責使用者">
@@ -197,12 +200,18 @@ export default function DispatchCaseList() {
             name="defaultOvertimeChangeToCompTime"
             label="加班申請核准後預設換算方式"
             valuePropName="checked"
-            tooltip="這個派遣個案底下的員工送出加班申請時不再自己選擇，一律依這個派遣個案的預設值換算"
+            tooltip="這個個案底下的員工送出加班申請時不再自己選擇，一律依這個個案的預設值換算"
             initialValue={false}
           >
             <Switch checkedChildren="換算成補休" unCheckedChildren="換算成加班費(現金)" />
           </Form.Item>
         </Form>
+        {editing && editing !== 'new' && (
+          <div style={{ fontSize: 12, color: '#999' }}>
+            建立時間：{formatDateTime(editing.createdAt)}　建立者：{editing.createdBy ?? '-'}　異動時間：
+            {formatDateTime(editing.updatedAt)}　異動者：{editing.updatedBy ?? '-'}
+          </div>
+        )}
       </Modal>
     </Layout>
   )

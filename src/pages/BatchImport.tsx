@@ -137,7 +137,7 @@ export default function BatchImport() {
       >
         <Space>
           <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>多公司班表匯入</span>
+          <span style={{ fontSize: 18, fontWeight: 600 }}>多客戶班表匯入</span>
         </Space>
       </div>
       <div style={{ padding: 24 }}>
@@ -146,12 +146,12 @@ export default function BatchImport() {
             items={[
               {
                 key: 'company-schedule',
-                label: '公司／班表',
+                label: '客戶／班表',
                 children: (
                   <BatchImportPanel
-                    description="一次匯出/匯入系統裡全部公司的公司基本資料與班表主檔。匯入範本=目前所有公司的現況資料，可直接下載後編輯再上傳；每一列各自獨立驗證，某幾列有誤不會影響其他正確列的寫入。"
+                    description="一次匯出/匯入系統裡全部客戶的客戶基本資料與班表主檔。匯入範本=目前所有客戶的現況資料，可直接下載後編輯再上傳；每一列各自獨立驗證，某幾列有誤不會影響其他正確列的寫入。"
                     templateUrl="/admin/batch-import/company-schedule/template"
-                    templateFilename="公司與班表匯入表.xlsx"
+                    templateFilename="客戶與班表匯入表.xlsx"
                     importUrl="/admin/batch-import/company-schedule"
                   />
                 ),
@@ -161,7 +161,7 @@ export default function BatchImport() {
                 label: '假別／加班別',
                 children: (
                   <BatchImportPanel
-                    description="一次匯出/匯入系統裡全部公司的假別主檔與加班別主檔。角色代碼/性別條件欄位請填「無特殊角色/年假/補休/生理假」「限男性/限女性/不限」等中文標籤(比照匯出範本的既有寫法)，不是原始代碼。"
+                    description="一次匯出/匯入系統裡全部客戶的假別主檔與加班別主檔。角色代碼/性別條件欄位請填「無特殊角色/年假/補休/生理假」「限男性/限女性/不限」等中文標籤(比照匯出範本的既有寫法)，不是原始代碼。"
                     templateUrl="/admin/batch-import/leave-type-work-overtime/template"
                     templateFilename="假別與加班別匯入表.xlsx"
                     importUrl="/admin/batch-import/leave-type-work-overtime"

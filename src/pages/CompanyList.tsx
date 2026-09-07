@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Layout, Modal, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { apiClient } from '../api/client'
+import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, LogPage } from '../types'
 
 const PAGE_SIZE = 20
@@ -22,7 +22,7 @@ export default function CompanyList() {
       setData(res.data)
     } catch (err) {
       const axiosErr = err as { response?: { data?: string } }
-      message.error(axiosErr.response?.data ?? '載入公司清單失敗')
+      message.error(axiosErr.response?.data ?? '載入客戶清單失敗')
     } finally {
       setLoading(false)
     }
@@ -34,8 +34,8 @@ export default function CompanyList() {
 
   const handleDelete = (record: CompanyListItem) => {
     Modal.confirm({
-      title: '確定要刪除這家公司？',
-      content: `公司代碼：${record.companyNum}`,
+      title: '確定要刪除這家客戶？',
+      content: `客戶編號：${record.companyNum}`,
       okType: 'danger',
       onOk: async () => {
         try {
@@ -51,15 +51,15 @@ export default function CompanyList() {
   }
 
   const columns: ColumnsType<CompanyListItem> = [
-    { title: '公司代碼', dataIndex: 'companyNum', key: 'companyNum' },
-    { title: '公司名稱', dataIndex: 'chName', key: 'chName' },
+    { title: '客戶編號', dataIndex: 'companyNum', key: 'companyNum' },
+    { title: '客戶名稱', dataIndex: 'chName', key: 'chName' },
     { title: '簡稱', dataIndex: 'name4Short', key: 'name4Short' },
     {
       title: '操作',
       key: 'action',
       render: (_, record) => (
         <Space size="middle">
-          <a onClick={() => navigate(`/dispatch-cases?companyId=${record.id}`)}>派遣個案/班表</a>
+          <a onClick={() => navigate(`/dispatch-cases?companyId=${record.id}`)}>個案維護/班表</a>
           <a onClick={() => navigate(`/companies/${record.id}`)}>編輯</a>
           <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
             刪除
@@ -83,10 +83,10 @@ export default function CompanyList() {
       >
         <Space>
           <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>公司維護</span>
+          <span style={{ fontSize: 18, fontWeight: 600 }}>客戶維護</span>
         </Space>
-        <Button type="primary" onClick={() => navigate('/companies/new')}>
-          新增公司
+        <Button type="primary" onClick={() => navigate('/companies/new')} disabled={isAdvisorRole()}>
+          新增客戶
         </Button>
       </div>
       <div style={{ padding: 24 }}>

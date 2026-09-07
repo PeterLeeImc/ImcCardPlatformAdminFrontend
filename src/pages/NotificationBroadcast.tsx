@@ -40,7 +40,7 @@ export default function NotificationBroadcast() {
       const values = await form.validateFields()
       setSending(true)
       await apiClient.post('/admin/notifications', values)
-      message.success('已發送全公司廣播')
+      message.success('已發送全客戶廣播')
       setComposeOpen(false)
       form.resetFields()
       setPage(0)
@@ -80,7 +80,7 @@ export default function NotificationBroadcast() {
           <span style={{ fontSize: 18, fontWeight: 600 }}>通知</span>
         </Space>
         <Button type="primary" onClick={() => setComposeOpen(true)}>
-          發送全公司廣播
+          發送全客戶廣播
         </Button>
       </div>
       <div style={{ padding: 24 }}>
@@ -99,7 +99,7 @@ export default function NotificationBroadcast() {
         />
       </div>
       <Modal
-        title="發送全公司廣播"
+        title="發送全客戶廣播"
         open={composeOpen}
         onCancel={() => setComposeOpen(false)}
         onOk={submitBroadcast}

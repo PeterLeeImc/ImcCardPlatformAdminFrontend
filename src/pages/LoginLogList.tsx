@@ -77,7 +77,7 @@ export default function LoginLogList() {
       <div style={{ padding: 24 }}>
         <Form form={form} layout="inline" onFinish={onSearch} style={{ marginBottom: 16 }}>
           <Form.Item name="range" label="日期區間">
-            <DatePicker.RangePicker />
+            <DatePicker.RangePicker format="YYYY/MM/DD" />
           </Form.Item>
           <Form.Item name="account" label="帳號">
             <Input placeholder="員工編號" allowClear style={{ width: 160 }} />

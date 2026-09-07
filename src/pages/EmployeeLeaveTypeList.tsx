@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Form, Input, InputNumber, Layout, Modal, Select, Space, Table, message } from 'antd'
+import { DatePicker, Form, Input, InputNumber, Layout, Modal, Select, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import dayjs from 'dayjs'
 import { apiClient } from '../api/client'
 import type {
   CompanyListItem,
@@ -11,9 +12,13 @@ import type {
   WebEmpLeaveTypeUpdateRequest,
   WebLeaveTypeItem,
 } from '../types'
+import { formatDate } from '../utils/formatDate'
+import { formatDateTime } from '../utils/formatDateTime'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
 const PAGE_SIZE = 20
+const DATE_FORMAT = 'YYYY/MM/DD'
+const WIRE_DATE_FORMAT = 'YYYY-MM-DD'
 
 export default function EmployeeLeaveTypeList() {
   const navigate = useNavigate()
@@ -29,7 +34,10 @@ export default function EmployeeLeaveTypeList() {
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<WebEmpLeaveTypeItem>()
   const [saving, setSaving] = useState(false)
-  const [form] = Form.useForm<WebEmpLeaveTypeUpdateRequest>()
+  const [form] = Form.useForm<Omit<WebEmpLeaveTypeUpdateRequest, 'startDate' | 'endDate'> & {
+    startDate: dayjs.Dayjs | null
+    endDate: dayjs.Dayjs | null
+  }>()
 
   useEffect(() => {
     apiClient
@@ -40,7 +48,7 @@ export default function EmployeeLeaveTypeList() {
           setCompanyId(res.data.content[0].id)
         }
       })
-      .catch(() => message.error('載入公司清單失敗'))
+      .catch(() => message.error('載入客戶清單失敗'))
   }, [])
 
   useEffect(() => {
@@ -88,8 +96,8 @@ export default function EmployeeLeaveTypeList() {
   const openEdit = (row: WebEmpLeaveTypeItem) => {
     setEditing(row)
     form.setFieldsValue({
-      startDate: row.startDate,
-      endDate: row.endDate,
+      startDate: row.startDate ? dayjs(row.startDate) : null,
+      endDate: row.endDate ? dayjs(row.endDate) : null,
       availableHours: row.availableHours ?? 0,
       remainingHours: row.remainingHours ?? 0,
       useHours: row.useHours ?? 0,
@@ -102,7 +110,12 @@ export default function EmployeeLeaveTypeList() {
     try {
       const values = await form.validateFields()
       setSaving(true)
-      await apiClient.put(`/admin/employee-leave-types/${editing.id}`, values)
+      const body: WebEmpLeaveTypeUpdateRequest = {
+        ...values,
+        startDate: values.startDate ? values.startDate.format(WIRE_DATE_FORMAT) : null,
+        endDate: values.endDate ? values.endDate.format(WIRE_DATE_FORMAT) : null,
+      }
+      await apiClient.put(`/admin/employee-leave-types/${editing.id}`, body)
       message.success('已更新')
       setEditing(undefined)
       fetchRows(page)
@@ -119,8 +132,8 @@ export default function EmployeeLeaveTypeList() {
     { title: '員工編號', dataIndex: 'employeeNum', key: 'employeeNum' },
     { title: '姓名', dataIndex: 'employeeChname', key: 'employeeChname' },
     { title: '假別', dataIndex: 'leaveTypeName', key: 'leaveTypeName' },
-    { title: '起日', dataIndex: 'startDate', key: 'startDate' },
-    { title: '迄日', dataIndex: 'endDate', key: 'endDate' },
+    { title: '起日', dataIndex: 'startDate', key: 'startDate', render: formatDate },
+    { title: '迄日', dataIndex: 'endDate', key: 'endDate', render: formatDate },
     { title: '總額度', dataIndex: 'availableHours', key: 'availableHours' },
     { title: '剩餘時數', dataIndex: 'remainingHours', key: 'remainingHours' },
     { title: '已使用', dataIndex: 'useHours', key: 'useHours' },
@@ -144,14 +157,15 @@ export default function EmployeeLeaveTypeList() {
       >
         <Space>
           <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>員工配假維護</span>
+          <span style={{ fontSize: 18, fontWeight: 600 }}>員工配假設定</span>
         </Space>
       </div>
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
+          <span>選擇客戶：</span>
           <Select
             style={{ width: 240 }}
-            placeholder="選擇公司"
+            placeholder="選擇客戶"
             value={companyId}
             onChange={(v) => {
               setCompanyId(v)
@@ -159,6 +173,7 @@ export default function EmployeeLeaveTypeList() {
             }}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
           />
+          <span>選擇派遣個案(篩選假別選項)：</span>
           <Select
             style={{ width: 200 }}
             placeholder="選擇派遣個案(篩選假別選項)"
@@ -211,11 +226,11 @@ export default function EmployeeLeaveTypeList() {
       >
         <Form form={form} layout="vertical">
           <Space style={{ width: '100%' }}>
-            <Form.Item name="startDate" label="起日(yyyy-MM-dd)">
-              <Input placeholder="2026-01-01" />
+            <Form.Item name="startDate" label="起日">
+              <DatePicker format={DATE_FORMAT} />
             </Form.Item>
-            <Form.Item name="endDate" label="迄日(yyyy-MM-dd)">
-              <Input placeholder="2026-12-31" />
+            <Form.Item name="endDate" label="迄日">
+              <DatePicker format={DATE_FORMAT} />
             </Form.Item>
           </Space>
           <Form.Item
@@ -239,6 +254,12 @@ export default function EmployeeLeaveTypeList() {
             <Input.TextArea rows={2} />
           </Form.Item>
         </Form>
+        {editing && (
+          <div style={{ fontSize: 12, color: '#999' }}>
+            建立時間：{formatDateTime(editing.createdAt)}　建立者：{editing.createdBy ?? '-'}　異動時間：
+            {formatDateTime(editing.updatedAt)}　異動者：{editing.updatedBy ?? '-'}
+          </div>
+        )}
       </Modal>
     </Layout>
   )

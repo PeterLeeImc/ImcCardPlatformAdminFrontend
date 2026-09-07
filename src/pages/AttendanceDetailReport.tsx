@@ -4,6 +4,7 @@ import { Button, InputNumber, Layout, Select, Space, Table, message } from 'antd
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
 import type { AttendanceReportRow, CompanyListItem, LogPage } from '../types'
+import { formatDate } from '../utils/formatDate'
 
 const today = new Date()
 
@@ -26,7 +27,7 @@ export default function AttendanceDetailReport() {
           setCompanyId(res.data.content[0].id)
         }
       })
-      .catch(() => message.error('載入公司清單失敗'))
+      .catch(() => message.error('載入客戶清單失敗'))
   }, [])
 
   const fetchRows = () => {
@@ -71,7 +72,7 @@ export default function AttendanceDetailReport() {
   const columns: ColumnsType<AttendanceReportRow> = [
     { title: '員工編號', dataIndex: 'employeeNum', key: 'employeeNum' },
     { title: '姓名', dataIndex: 'chName', key: 'chName' },
-    { title: '日期', dataIndex: 'date', key: 'date' },
+    { title: '日期', dataIndex: 'date', key: 'date', render: formatDate },
     { title: '班別', dataIndex: 'workType', key: 'workType' },
     { title: '打卡開始', dataIndex: 'cardStart', key: 'cardStart' },
     { title: '打卡結束', dataIndex: 'cardEnd', key: 'cardEnd' },
@@ -112,9 +113,10 @@ export default function AttendanceDetailReport() {
       </div>
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
+          <span>選擇客戶：</span>
           <Select
             style={{ width: 240 }}
-            placeholder="選擇公司"
+            placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}

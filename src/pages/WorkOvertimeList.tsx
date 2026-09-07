@@ -4,6 +4,7 @@ import { Button, Form, Input, Layout, Modal, Select, Space, Table, message } fro
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
 import type { CompanyListItem, LogPage, WorkOvertimeItem, WorkOvertimeUpsertRequest } from '../types'
+import { formatDateTime } from '../utils/formatDateTime'
 
 export default function WorkOvertimeList() {
   const navigate = useNavigate()
@@ -24,7 +25,7 @@ export default function WorkOvertimeList() {
           setCompanyId(res.data.content[0].id)
         }
       })
-      .catch(() => message.error('載入公司清單失敗'))
+      .catch(() => message.error('載入客戶清單失敗'))
   }, [])
 
   const fetchRows = () => {
@@ -133,9 +134,10 @@ export default function WorkOvertimeList() {
       </div>
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }}>
+          <span>選擇客戶：</span>
           <Select
             style={{ width: 240 }}
-            placeholder="選擇公司"
+            placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
@@ -156,6 +158,12 @@ export default function WorkOvertimeList() {
             <Input placeholder="例如：平日加班、假日加班" />
           </Form.Item>
         </Form>
+        {editing && editing !== 'new' && (
+          <div style={{ fontSize: 12, color: '#999' }}>
+            建立時間：{formatDateTime(editing.createdAt)}　建立者：{editing.createdBy ?? '-'}　異動時間：
+            {formatDateTime(editing.updatedAt)}　異動者：{editing.updatedBy ?? '-'}
+          </div>
+        )}
       </Modal>
     </Layout>
   )

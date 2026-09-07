@@ -11,6 +11,7 @@ import {
   type LeaveTypeMasterUpsertRequest,
   type LogPage,
 } from '../types'
+import { formatDateTime } from '../utils/formatDateTime'
 
 export default function LeaveTypeList() {
   const navigate = useNavigate()
@@ -31,7 +32,7 @@ export default function LeaveTypeList() {
           setCompanyId(res.data.content[0].id)
         }
       })
-      .catch(() => message.error('載入公司清單失敗'))
+      .catch(() => message.error('載入客戶清單失敗'))
   }, [])
 
   const fetchRows = () => {
@@ -60,7 +61,6 @@ export default function LeaveTypeList() {
       form.setFieldsValue({
         chname: row.chname,
         enname: row.enname ?? undefined,
-        sort: row.sort ?? undefined,
         leaveDefaultFiled: row.leaveDefaultFiled ?? undefined,
         leaveSexCondition: row.leaveSexCondition ?? undefined,
         attachFileHours: row.attachFileHours ?? undefined,
@@ -113,7 +113,6 @@ export default function LeaveTypeList() {
     options.find((o) => o.value === value)?.label ?? '-'
 
   const columns: ColumnsType<LeaveTypeMasterItem> = [
-    { title: '排序', dataIndex: 'sort', key: 'sort', width: 80 },
     { title: '中文名稱', dataIndex: 'chname', key: 'chname' },
     { title: '英文名稱', dataIndex: 'enname', key: 'enname' },
     {
@@ -165,9 +164,10 @@ export default function LeaveTypeList() {
       </div>
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }}>
+          <span>選擇客戶：</span>
           <Select
             style={{ width: 240 }}
-            placeholder="選擇公司"
+            placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
@@ -190,10 +190,7 @@ export default function LeaveTypeList() {
           <Form.Item name="enname" label="英文名稱">
             <Input />
           </Form.Item>
-          <Form.Item name="sort" label="排序">
-            <InputNumber style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="leaveDefaultFiled" label="角色代碼" extra="用來讓系統識別這筆假別在流程中的特殊角色，例如公司配假維護的批次動作要靠這個代碼找到「年假」「補休」對應的假別，不是用名稱比對">
+          <Form.Item name="leaveDefaultFiled" label="角色代碼" extra="用來讓系統識別這筆假別在流程中的特殊角色，例如客戶配假設定的批次動作要靠這個代碼找到「年假」「補休」對應的假別，不是用名稱比對">
             <Select allowClear options={LEAVE_DEFAULT_FILED_OPTIONS} />
           </Form.Item>
           <Form.Item name="leaveSexCondition" label="性別條件">
@@ -203,6 +200,12 @@ export default function LeaveTypeList() {
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
         </Form>
+        {editing && editing !== 'new' && (
+          <div style={{ fontSize: 12, color: '#999' }}>
+            建立時間：{formatDateTime(editing.createdAt)}　建立者：{editing.createdBy ?? '-'}　異動時間：
+            {formatDateTime(editing.updatedAt)}　異動者：{editing.updatedBy ?? '-'}
+          </div>
+        )}
       </Modal>
     </Layout>
   )

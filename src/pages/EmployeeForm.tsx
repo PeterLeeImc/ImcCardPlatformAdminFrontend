@@ -1,52 +1,77 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Checkbox, Form, Input, Layout, Modal, Select, Space, Spin, message } from 'antd'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Button, DatePicker, Form, Input, Layout, Select, Space, Spin, message } from 'antd'
+import dayjs from 'dayjs'
 import { apiClient } from '../api/client'
-import type { DispatchCaseItem, EmployeeDetail, EmployeeUpsertRequest } from '../types'
-import { JOB_STATUS_OPTIONS, MARRIAGE_OPTIONS, ROLE_OPTIONS, SEX_OPTIONS } from '../types'
+import type { CompanyListItem, DispatchCaseItem, EmployeeDetail, EmployeeUpsertRequest, LogPage } from '../types'
+import { EMPLOYEE_ROLE_OPTIONS, JOB_STATUS_OPTIONS, SEX_OPTIONS } from '../types'
+import { formatDateTime } from '../utils/formatDateTime'
+
+const DATE_FORMAT = 'YYYY/MM/DD'
+const WIRE_DATE_FORMAT = 'YYYY-MM-DD'
 
 interface EmployeeFormValues {
   employeenum: string
+  companyId: number
+  dispatchCaseId: number
   chname: string
-  enname: string
   role: string
-  idNum: string
-  nation: string
-  birthday: string
   sex: string
-  marriage: string
-  homePhone: string
   mobilePhone: string
-  contactZipCode: string
-  contactAddr: string
-  registeredZipCode: string
-  registeredAddr: string
-  email: string
-  takeDate: string
-  leaveDate: string
-  jobTitle: string
+  takeDate: dayjs.Dayjs | null
+  leaveDate: dayjs.Dayjs | null
   jobStatus: string
-  cardNum: string
-  cardDataFrom: string
   chargeHeadNum: string
-  disabilityLevel: string
-  overtimePay: boolean
-  leaveAttachment: boolean
-  memo: string
 }
 
 export default function EmployeeForm() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
   const isEdit = !!id
   const [form] = Form.useForm<EmployeeFormValues>()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [detail, setDetail] = useState<EmployeeDetail>()
-  const [caseModalOpen, setCaseModalOpen] = useState(false)
-  const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
-  const [caseChanging, setCaseChanging] = useState(false)
-  const [selectedCaseId, setSelectedCaseId] = useState<number>()
+  const [companies, setCompanies] = useState<CompanyListItem[]>([])
+  const [newCompanyId, setNewCompanyId] = useState<number>()
+  const [newDispatchCases, setNewDispatchCases] = useState<DispatchCaseItem[]>([])
+
+  // 新增員工要先選客戶才知道有哪些派遣個案可選，這裡只在新增模式下載入客戶清單。
+  useEffect(() => {
+    if (isEdit) return
+    apiClient
+      .get<LogPage<CompanyListItem>>('/admin/companies', { params: { page: 0, size: 200 } })
+      .then((res) => {
+        setCompanies(res.data.content)
+        const fromUrl = Number(searchParams.get('companyId'))
+        const initialCompanyId = fromUrl && res.data.content.some((c) => c.id === fromUrl) ? fromUrl : undefined
+        if (initialCompanyId) {
+          setNewCompanyId(initialCompanyId)
+          form.setFieldValue('companyId', initialCompanyId)
+        }
+      })
+      .catch(() => message.error('載入客戶清單失敗'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit])
+
+  useEffect(() => {
+    if (isEdit || !newCompanyId) {
+      setNewDispatchCases([])
+      return
+    }
+    apiClient
+      .get<DispatchCaseItem[]>(`/admin/companies/${newCompanyId}/dispatch-cases`)
+      .then((res) => {
+        setNewDispatchCases(res.data)
+        const fromUrl = Number(searchParams.get('dispatchCaseId'))
+        if (fromUrl && res.data.some((d) => d.id === fromUrl)) {
+          form.setFieldValue('dispatchCaseId', fromUrl)
+        }
+      })
+      .catch(() => setNewDispatchCases([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, newCompanyId])
 
   useEffect(() => {
     if (!isEdit) return
@@ -59,31 +84,13 @@ export default function EmployeeForm() {
         form.setFieldsValue({
           employeenum: d.employeenum,
           chname: d.chname,
-          enname: d.enname,
           role: d.role,
-          idNum: d.idNum,
-          nation: d.nation ?? '',
-          birthday: d.birthday ?? '',
           sex: d.sex ?? undefined,
-          marriage: d.marriage ?? undefined,
-          homePhone: d.homePhone ?? '',
           mobilePhone: d.mobilePhone ?? '',
-          contactZipCode: d.contactZipCode ?? '',
-          contactAddr: d.contactAddr ?? '',
-          registeredZipCode: d.registeredZipCode ?? '',
-          registeredAddr: d.registeredAddr ?? '',
-          email: d.email ?? '',
-          takeDate: d.takeDate ?? '',
-          leaveDate: d.leaveDate ?? '',
-          jobTitle: d.jobTitle ?? '',
+          takeDate: d.takeDate ? dayjs(d.takeDate) : null,
+          leaveDate: d.leaveDate ? dayjs(d.leaveDate) : null,
           jobStatus: d.jobStatus ?? undefined,
-          cardNum: d.cardNum ?? '',
-          cardDataFrom: d.cardDataFrom ?? '',
           chargeHeadNum: d.chargeHeadNum ?? '',
-          disabilityLevel: d.disabilityLevel ?? '',
-          overtimePay: d.overtimePay === 1,
-          leaveAttachment: d.leaveAttachment === 1,
-          memo: d.memo ?? '',
         })
       })
       .catch((err) => {
@@ -93,78 +100,47 @@ export default function EmployeeForm() {
       .finally(() => setLoading(false))
   }, [id, isEdit, form])
 
+  /** 儲存/取消都要回員工維護清單，並直接帶著這位員工所屬的客戶／派遣個案查詢，而不是回到
+   * 進入這個表單前清單頁剛好停在哪個篩選狀態(那個狀態可能跟這位員工完全無關)。 */
+  const goToListFor = (companyId?: number, dispatchCaseId?: number) => {
+    const params = new URLSearchParams()
+    if (companyId) params.set('companyId', String(companyId))
+    if (dispatchCaseId) params.set('dispatchCaseId', String(dispatchCaseId))
+    navigate(`/employees?${params.toString()}`)
+  }
+
   const onFinish = async (values: EmployeeFormValues) => {
     setSubmitting(true)
     try {
       const body: EmployeeUpsertRequest = {
         chname: values.chname,
-        enname: values.enname,
         role: values.role,
-        idNum: values.idNum,
-        nation: values.nation || undefined,
-        birthday: values.birthday || undefined,
         sex: values.sex,
-        marriage: values.marriage,
-        homePhone: values.homePhone || undefined,
         mobilePhone: values.mobilePhone || undefined,
-        contactZipCode: values.contactZipCode || undefined,
-        contactAddr: values.contactAddr || undefined,
-        registeredZipCode: values.registeredZipCode || undefined,
-        registeredAddr: values.registeredAddr || undefined,
-        email: values.email || undefined,
-        takeDate: values.takeDate || undefined,
-        leaveDate: values.leaveDate || undefined,
-        jobTitle: values.jobTitle || undefined,
+        takeDate: values.takeDate ? values.takeDate.format(WIRE_DATE_FORMAT) : undefined,
+        leaveDate: values.leaveDate ? values.leaveDate.format(WIRE_DATE_FORMAT) : undefined,
         jobStatus: values.jobStatus,
-        cardNum: values.cardNum || undefined,
-        cardDataFrom: values.cardDataFrom || undefined,
         chargeHeadNum: values.chargeHeadNum || undefined,
-        disabilityLevel: values.disabilityLevel || undefined,
-        overtimePay: !!values.overtimePay,
-        leaveAttachment: !!values.leaveAttachment,
-        memo: values.memo || undefined,
       }
       if (isEdit) {
-        await apiClient.put(`/admin/employees/${id}`, body)
+        const res = await apiClient.put<EmployeeDetail>(`/admin/employees/${id}`, body)
         message.success('已更新員工')
+        goToListFor(res.data.companyId ?? undefined, res.data.dispatchCaseId ?? undefined)
       } else {
-        await apiClient.post('/admin/employees', { ...body, employeenum: values.employeenum })
+        const res = await apiClient.post<EmployeeDetail>('/admin/employees', {
+          ...body,
+          employeenum: values.employeenum,
+          companyId: values.companyId,
+          dispatchCaseId: values.dispatchCaseId,
+        })
         message.success('已新增員工')
+        goToListFor(res.data.companyId ?? undefined, res.data.dispatchCaseId ?? undefined)
       }
-      navigate('/employees')
     } catch (err) {
       const axiosErr = err as { response?: { data?: string } }
       message.error(axiosErr.response?.data ?? (isEdit ? '更新失敗' : '新增失敗'))
     } finally {
       setSubmitting(false)
-    }
-  }
-
-  const openCaseModal = () => {
-    if (!detail?.companyId) return
-    apiClient
-      .get<DispatchCaseItem[]>(`/admin/companies/${detail.companyId}/dispatch-cases`)
-      .then((res) => setDispatchCases(res.data))
-      .catch(() => message.error('載入派遣個案清單失敗'))
-    setSelectedCaseId(detail?.dispatchCaseId ?? undefined)
-    setCaseModalOpen(true)
-  }
-
-  const submitCaseChange = async () => {
-    if (!id || !selectedCaseId) return
-    setCaseChanging(true)
-    try {
-      const res = await apiClient.post<EmployeeDetail>(`/admin/employees/${id}/dispatch-case`, {
-        dispatchCaseId: selectedCaseId,
-      })
-      setDetail(res.data)
-      message.success('已異動派遣個案')
-      setCaseModalOpen(false)
-    } catch (err) {
-      const axiosErr = err as { response?: { data?: string } }
-      message.error(axiosErr.response?.data ?? '異動派遣個案失敗')
-    } finally {
-      setCaseChanging(false)
     }
   }
 
@@ -184,36 +160,52 @@ export default function EmployeeForm() {
           <span style={{ fontSize: 18, fontWeight: 600 }}>{isEdit ? '編輯員工' : '新增員工'}</span>
         </Space>
       </div>
-      <div style={{ maxWidth: 720, margin: '32px auto', width: '100%', background: '#fff', borderRadius: 12, padding: 32 }}>
+      <div style={{ maxWidth: 560, margin: '32px auto', width: '100%', background: '#fff', borderRadius: 12, padding: 32 }}>
         <Spin spinning={loading}>
-          {isEdit && (
-            <div style={{ marginBottom: 24, padding: 16, background: '#f5f6f8', borderRadius: 8 }}>
-              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ fontSize: 13, color: '#999' }}>目前派遣個案</div>
-                  <div style={{ fontSize: 15, fontWeight: 600 }}>{detail?.dispatchCaseCode ?? '未設定'}</div>
-                </div>
-                <Button onClick={openCaseModal}>異動派遣個案</Button>
-              </Space>
-            </div>
-          )}
-          <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ jobStatus: '001' }}>
-            {!isEdit && (
-              <Form.Item name="employeenum" label="員工編號" rules={[{ required: true, message: '請輸入員工編號' }]}>
-                <Input />
-              </Form.Item>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={onFinish}
+            initialValues={{ role: '006', jobStatus: '001', sex: '001', takeDate: dayjs() }}
+          >
+            {isEdit ? (
+              <>
+                <Form.Item label="客戶名稱">
+                  <Input value={detail?.companyName ?? ''} disabled />
+                </Form.Item>
+                <Form.Item label="個案編號">
+                  <Input value={detail?.dispatchCaseCode ?? '未設定'} disabled />
+                </Form.Item>
+              </>
+            ) : (
+              <>
+                <Form.Item name="employeenum" label="員工編號" rules={[{ required: true, message: '請輸入員工編號' }]}>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="companyId" label="客戶" rules={[{ required: true, message: '請選擇客戶' }]}>
+                  <Select
+                    placeholder="選擇客戶"
+                    options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+                    onChange={(v) => {
+                      setNewCompanyId(v)
+                      form.setFieldValue('dispatchCaseId', undefined)
+                    }}
+                  />
+                </Form.Item>
+                <Form.Item name="dispatchCaseId" label="個案" rules={[{ required: true, message: '請選擇個案' }]}>
+                  <Select
+                    placeholder={newCompanyId ? '選擇個案' : '請先選擇客戶'}
+                    disabled={!newCompanyId}
+                    options={newDispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
+                  />
+                </Form.Item>
+              </>
             )}
             <Form.Item name="chname" label="中文姓名" rules={[{ required: true, message: '請輸入中文姓名' }]}>
               <Input />
             </Form.Item>
-            <Form.Item name="enname" label="英文姓名" rules={[{ required: true, message: '請輸入英文姓名' }]}>
-              <Input />
-            </Form.Item>
-            <Form.Item name="idNum" label="身分證字號" rules={[{ required: true, message: '請輸入身分證字號' }]}>
-              <Input />
-            </Form.Item>
             <Form.Item name="role" label="角色" rules={[{ required: true, message: '請選擇角色' }]}>
-              <Select options={ROLE_OPTIONS} />
+              <Select options={EMPLOYEE_ROLE_OPTIONS} />
             </Form.Item>
             <Form.Item name="jobStatus" label="在職狀態">
               <Select options={JOB_STATUS_OPTIONS} allowClear />
@@ -221,57 +213,15 @@ export default function EmployeeForm() {
             <Form.Item name="sex" label="性別">
               <Select options={SEX_OPTIONS} allowClear />
             </Form.Item>
-            <Form.Item name="marriage" label="婚姻狀況">
-              <Select options={MARRIAGE_OPTIONS} allowClear />
-            </Form.Item>
-            <Form.Item name="birthday" label="生日(yyyy-MM-dd)">
-              <Input placeholder="1990-01-01" />
-            </Form.Item>
-            <Form.Item name="nation" label="國別">
-              <Input placeholder="TWN" />
-            </Form.Item>
-            <Form.Item name="homePhone" label="住家電話">
-              <Input />
-            </Form.Item>
             <Form.Item name="mobilePhone" label="手機">
               <Input />
             </Form.Item>
-            <Form.Item name="email" label="Email" rules={[{ type: 'email', message: 'Email格式不正確' }]}>
-              <Input />
-            </Form.Item>
             <Space style={{ width: '100%' }}>
-              <Form.Item name="contactZipCode" label="通訊地址郵遞區號">
-                <Input style={{ width: 140 }} />
+              <Form.Item name="takeDate" label="到職日">
+                <DatePicker format={DATE_FORMAT} />
               </Form.Item>
-              <Form.Item name="contactAddr" label="通訊地址" style={{ flex: 1 }}>
-                <Input />
-              </Form.Item>
-            </Space>
-            <Space style={{ width: '100%' }}>
-              <Form.Item name="registeredZipCode" label="戶籍地址郵遞區號">
-                <Input style={{ width: 140 }} />
-              </Form.Item>
-              <Form.Item name="registeredAddr" label="戶籍地址" style={{ flex: 1 }}>
-                <Input />
-              </Form.Item>
-            </Space>
-            <Space style={{ width: '100%' }}>
-              <Form.Item name="takeDate" label="到職日(yyyy-MM-dd)">
-                <Input placeholder="2026-01-01" />
-              </Form.Item>
-              <Form.Item name="leaveDate" label="離職日(yyyy-MM-dd)">
-                <Input placeholder="2026-12-31" />
-              </Form.Item>
-            </Space>
-            <Form.Item name="jobTitle" label="職稱">
-              <Input />
-            </Form.Item>
-            <Space style={{ width: '100%' }}>
-              <Form.Item name="cardNum" label="打卡卡號">
-                <Input style={{ width: 200 }} />
-              </Form.Item>
-              <Form.Item name="cardDataFrom" label="卡號來源">
-                <Input style={{ width: 200 }} />
+              <Form.Item name="leaveDate" label="離職日">
+                <DatePicker format={DATE_FORMAT} />
               </Form.Item>
             </Space>
             <Form.Item
@@ -286,49 +236,31 @@ export default function EmployeeForm() {
                 目前算出的簽核主管：{detail.realChargeHeadNum}
               </div>
             )}
-            <Form.Item name="disabilityLevel" label="身心障礙等級">
-              <Input />
-            </Form.Item>
-            <Form.Item name="overtimePay" valuePropName="checked">
-              <Checkbox>加班可轉換成加班費</Checkbox>
-            </Form.Item>
-            <Form.Item name="leaveAttachment" valuePropName="checked">
-              <Checkbox>請假需要附件</Checkbox>
-            </Form.Item>
-            <Form.Item name="memo" label="備註">
-              <Input.TextArea rows={2} />
-            </Form.Item>
+            {isEdit && detail && (
+              <div style={{ marginBottom: 16, fontSize: 12, color: '#999' }}>
+                建立時間：{formatDateTime(detail.createdAt)}　建立者：{detail.createdBy ?? '-'}　異動時間：
+                {formatDateTime(detail.updatedAt)}　異動者：{detail.updatedBy ?? '-'}
+              </div>
+            )}
             <Form.Item style={{ marginBottom: 0 }}>
               <Space>
                 <Button type="primary" htmlType="submit" loading={submitting}>
                   儲存
                 </Button>
-                <Button onClick={() => navigate('/employees')}>取消</Button>
+                <Button
+                  onClick={() =>
+                    isEdit
+                      ? goToListFor(detail?.companyId ?? undefined, detail?.dispatchCaseId ?? undefined)
+                      : goToListFor(newCompanyId, form.getFieldValue('dispatchCaseId'))
+                  }
+                >
+                  取消
+                </Button>
               </Space>
             </Form.Item>
           </Form>
         </Spin>
       </div>
-      <Modal
-        title="異動派遣個案"
-        open={caseModalOpen}
-        onCancel={() => setCaseModalOpen(false)}
-        onOk={submitCaseChange}
-        confirmLoading={caseChanging}
-        destroyOnHidden
-      >
-        <div style={{ marginBottom: 12, fontSize: 13, color: '#666' }}>
-          純粹記錄這位員工屬於哪個派遣個案(影響班表/假別規則選項)，不影響簽核設定；簽核人請在上方
-          「簽核人員工編號」欄位設定。
-        </div>
-        <Select
-          style={{ width: '100%' }}
-          placeholder="選擇新派遣個案"
-          value={selectedCaseId}
-          onChange={setSelectedCaseId}
-          options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
-        />
-      </Modal>
     </Layout>
   )
 }

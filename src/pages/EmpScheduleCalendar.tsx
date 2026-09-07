@@ -97,7 +97,7 @@ export default function EmpScheduleCalendar() {
           setCompanyId(res.data.content[0].id)
         }
       })
-      .catch(() => message.error('載入公司清單失敗'))
+      .catch(() => message.error('載入客戶清單失敗'))
   }, [])
 
   useEffect(() => {
@@ -380,13 +380,15 @@ export default function EmpScheduleCalendar() {
       </div>
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
+          <span>選擇客戶：</span>
           <Select
             style={{ width: 240 }}
-            placeholder="選擇公司"
+            placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
           />
+          <span>選擇派遣個案：</span>
           <Select
             style={{ width: 200 }}
             placeholder="選擇派遣個案"
@@ -494,7 +496,7 @@ export default function EmpScheduleCalendar() {
         <div style={{ marginTop: 24, background: '#fff', borderRadius: 8, padding: 16 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>批次匯入</div>
           <div style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>
-            下載範本(會回填這家公司目前該月排班) → 編輯Excel → 選檔上傳 → 執行匯入
+            下載範本(會回填這家客戶目前該月排班) → 編輯Excel → 選檔上傳 → 執行匯入
           </div>
           <Space wrap style={{ marginBottom: 12 }}>
             <Button onClick={downloadTemplate} disabled={!dispatchCaseId}>
@@ -550,6 +552,7 @@ export default function EmpScheduleCalendar() {
                 minDate={dayjs(today)}
                 onChange={(d) => d && setEditDate(d)}
                 style={{ width: '100%' }}
+                format="YYYY/MM/DD"
               />
             </div>
             <div>

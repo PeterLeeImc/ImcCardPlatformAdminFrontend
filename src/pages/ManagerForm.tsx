@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Form, Input, Layout, Select, Space, Spin, message } from 'antd'
 import { apiClient } from '../api/client'
 import type { ManagerCreateRequest, ManagerDetail, ManagerUpdateRequest } from '../types'
-import { ENABLED_OPTIONS, ROLE_OPTIONS } from '../types'
+import { ENABLED_OPTIONS, MANAGER_ROLE_OPTIONS } from '../types'
+import { formatDateTime } from '../utils/formatDateTime'
 
 const PASSWORD_RULE = /^[a-zA-Z][0-9a-zA-Z]{3,}$/
 
@@ -23,6 +24,7 @@ export default function ManagerForm() {
   const [form] = Form.useForm<ManagerFormValues>()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [detail, setDetail] = useState<ManagerDetail>()
 
   useEffect(() => {
     if (!isEdit) return
@@ -30,6 +32,7 @@ export default function ManagerForm() {
     apiClient
       .get<ManagerDetail>(`/admin/managers/${id}`)
       .then((res) => {
+        setDetail(res.data)
         form.setFieldsValue({
           account: res.data.account,
           username: res.data.username,
@@ -97,10 +100,15 @@ export default function ManagerForm() {
       <div style={{ maxWidth: 480, margin: '32px auto', width: '100%', background: '#fff', borderRadius: 12, padding: 32 }}>
         <Spin spinning={loading}>
           <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ enabled: '1' }}>
-            {!isEdit && (
+            {isEdit ? (
+              <Form.Item label="帳號" tooltip="IMC使用者帳號">
+                <Input value={detail?.account} disabled />
+              </Form.Item>
+            ) : (
               <Form.Item
                 name="account"
                 label="帳號"
+                tooltip="IMC使用者帳號"
                 rules={[{ required: true, message: '請輸入帳號' }]}
               >
                 <Input placeholder="帳號" autoComplete="off" />
@@ -135,12 +143,18 @@ export default function ManagerForm() {
               <Input placeholder="Email" />
             </Form.Item>
             <Form.Item name="role" label="角色" rules={[{ required: true, message: '請選擇角色' }]}>
-              <Select options={ROLE_OPTIONS} placeholder="請選擇角色" />
+              <Select options={MANAGER_ROLE_OPTIONS} placeholder="請選擇角色" />
             </Form.Item>
             {/* enabled為舊ZK系統遺留的字串型boolean-ish欄位，新畫面簡化為啟用/停用兩個選項 */}
             <Form.Item name="enabled" label="狀態" rules={[{ required: true, message: '請選擇狀態' }]}>
               <Select options={ENABLED_OPTIONS} placeholder="請選擇狀態" />
             </Form.Item>
+            {isEdit && detail && (
+              <div style={{ marginBottom: 16, fontSize: 12, color: '#999' }}>
+                建立時間：{formatDateTime(detail.createdAt)}　建立者：{detail.createdBy ?? '-'}　異動時間：
+                {formatDateTime(detail.updatedAt)}　異動者：{detail.updatedBy ?? '-'}
+              </div>
+            )}
             <Form.Item style={{ marginBottom: 0 }}>
               <Space>
                 <Button type="primary" htmlType="submit" loading={submitting}>

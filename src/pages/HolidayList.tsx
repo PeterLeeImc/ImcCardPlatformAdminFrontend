@@ -18,9 +18,12 @@ import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { apiClient } from '../api/client'
 import type { HolidayItem, HolidayUpsertRequest, LogPage } from '../types'
+import { formatDate } from '../utils/formatDate'
+import { formatDateTime } from '../utils/formatDateTime'
 
 const PAGE_SIZE = 50
 const CURRENT_YEAR = String(new Date().getFullYear())
+const DATE_FORMAT = 'YYYY/MM/DD'
 
 interface ImportResult {
   successCount: number
@@ -153,11 +156,11 @@ export default function HolidayList() {
   }
 
   const columns: ColumnsType<HolidayItem> = [
-    { title: '日期', dataIndex: 'day', key: 'day' },
+    { title: '日期', dataIndex: 'day', key: 'day', render: formatDate },
     { title: '假日說明', dataIndex: 'explain', key: 'explain' },
-    { title: '建立時間', dataIndex: 'createdAt', key: 'createdAt' },
+    { title: '建立時間', dataIndex: 'createdAt', key: 'createdAt', render: formatDateTime },
     { title: '建立者', dataIndex: 'createdBy', key: 'createdBy' },
-    { title: '異動時間', dataIndex: 'updatedAt', key: 'updatedAt' },
+    { title: '異動時間', dataIndex: 'updatedAt', key: 'updatedAt', render: formatDateTime },
     { title: '異動者', dataIndex: 'updatedBy', key: 'updatedBy' },
     {
       title: '操作',
@@ -277,12 +280,18 @@ export default function HolidayList() {
       >
         <Form form={form} layout="vertical">
           <Form.Item name="day" label="日期" rules={[{ required: true, message: '請選擇日期' }]}>
-            <DatePicker style={{ width: '100%' }} />
+            <DatePicker style={{ width: '100%' }} format={DATE_FORMAT} />
           </Form.Item>
           <Form.Item name="explain" label="假日說明" rules={[{ required: true, message: '請輸入假日說明' }]}>
             <Input placeholder="例如：元旦、春節、颱風假" />
           </Form.Item>
         </Form>
+        {editing && editing !== 'new' && (
+          <div style={{ fontSize: 12, color: '#999' }}>
+            建立時間：{formatDateTime(editing.createdAt)}　建立者：{editing.createdBy ?? '-'}　異動時間：
+            {formatDateTime(editing.updatedAt)}　異動者：{editing.updatedBy ?? '-'}
+          </div>
+        )}
       </Modal>
     </Layout>
   )

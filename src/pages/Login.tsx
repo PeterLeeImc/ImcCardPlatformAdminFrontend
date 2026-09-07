@@ -15,6 +15,7 @@ interface LoginResponse {
   mustChangePassword: boolean
   operatingCompanyId: number | null
   operatingCompanyName: string | null
+  role: string | null
 }
 
 export default function Login() {
@@ -44,6 +45,11 @@ export default function Login() {
     localStorage.setItem('platformToken', res.data.token)
     localStorage.setItem('platformChname', res.data.chname)
     localStorage.setItem('platformMustChangePassword', String(res.data.mustChangePassword))
+    if (res.data.role) {
+      localStorage.setItem('platformRole', res.data.role)
+    } else {
+      localStorage.removeItem('platformRole')
+    }
     if (res.data.operatingCompanyId != null && res.data.operatingCompanyName != null) {
       localStorage.setItem('platformOperatingCompanyId', String(res.data.operatingCompanyId))
       localStorage.setItem('platformOperatingCompanyName', res.data.operatingCompanyName)
@@ -88,7 +94,7 @@ export default function Login() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f6f8' }}>
       <div style={{ width: 380, background: '#fff', borderRadius: 12, padding: 32, boxShadow: '0 1px 8px rgba(0,0,0,0.08)' }}>
-        <h2 style={{ textAlign: 'center', marginTop: 0, marginBottom: 24 }}>IMC後台管理</h2>
+        <h2 style={{ textAlign: 'center', marginTop: 0, marginBottom: 24 }}>IMC打卡平台管理端</h2>
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item name="employeenum" label="帳號" rules={[{ required: true, message: '請輸入帳號' }]}>
             <Input placeholder="帳號" autoComplete="username" />

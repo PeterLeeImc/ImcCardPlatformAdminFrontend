@@ -13,6 +13,10 @@ export interface ManagerListItem {
 export interface ManagerDetail extends ManagerListItem {
   lastUsedCompanyId: number | null
   lastUsedCompanyName: string | null
+  createdAt: string | null
+  createdBy: string | null
+  updatedAt: string | null
+  updatedBy: string | null
 }
 
 export interface ManagerPage {
@@ -38,17 +42,14 @@ export interface ManagerUpdateRequest {
   role: string
 }
 
-// role code table (ZK既有的角色代碼表，順序固定)
-export const ROLE_OPTIONS: { value: string; label: string }[] = [
+// 使用者(Manager帳號)的角色只能是系統管理者/系統使用者/顧問，一般員工/簽核員工是打卡RWD員工帳號
+// 的角色(見EMPLOYEE_ROLE_OPTIONS)，兩邊角色代碼表雖然共用同一張roles資料表，但下拉選單各自
+// 限定成使用情境對應的子集，不會互相混用。顧問跟系統使用者一樣受資料範圍限制(只能看到自己被指派為
+// 負責使用者的派遣個案/客戶)，見CompanyController/DispatchCaseController的isCompanyInScope()。
+export const MANAGER_ROLE_OPTIONS: { value: string; label: string }[] = [
   { value: '001', label: '系統管理者' },
-  { value: '002', label: '產品管理者' },
   { value: '003', label: '系統使用者' },
-  { value: '004', label: '人事管理者' },
-  { value: '005', label: '部門管理者' },
-  { value: '006', label: '一般員工' },
-  { value: '007', label: '公司管理者' },
-  { value: '008', label: '約聘員工' },
-  { value: '009', label: '直屬管理者' },
+  { value: '004', label: '顧問' },
 ]
 
 // enabled是舊ZK系統遺留下來的字串型boolean-ish欄位，實際資料看過"1"/"002"等值，
@@ -118,7 +119,7 @@ export interface BroadcastNotificationRequest {
   content: string
 }
 
-// 公司維護 (companies)
+// 客戶維護 (companies)
 
 export interface CompanyListItem {
   id: number
@@ -132,7 +133,6 @@ export interface CompanyDetail {
   companyNum: string
   chName: string
   name4Short: string
-  uniformNum: string
   addr: string | null
   latitude: number | null
   longitude: number | null
@@ -148,7 +148,6 @@ export interface CompanyCreateRequest {
   companyNum: string
   chName: string
   name4Short: string
-  uniformNum: string
   addr?: string
   latitude?: number
   longitude?: number
@@ -163,7 +162,7 @@ export const PUNCH_METHOD_OPTIONS = [
   { value: 'PHOTO', label: '拍照打卡' },
 ]
 
-// 公司配假維護 / 員工配假維護
+// 客戶配假設定 / 員工配假設定
 
 export interface WebLeaveTypeItem {
   id: number
@@ -176,10 +175,12 @@ export interface WebLeaveTypeItem {
   useTime: string | null
   defaultHours: number | null
   jobWorkDay: number | null
-  employeeStyle: string | null
-  useCode: string | null
   annualEffectiveDate: string | null
   accumulatingLeaveType: string | null
+  createdAt: string | null
+  createdBy: string | null
+  updatedAt: string | null
+  updatedBy: string | null
 }
 
 export interface WebLeaveTypeUpdateRequest {
@@ -189,8 +190,6 @@ export interface WebLeaveTypeUpdateRequest {
   useTime: string | null
   defaultHours: number | null
   jobWorkDay: number | null
-  employeeStyle: string | null
-  useCode: string | null
   annualEffectiveDate: string | null
   accumulatingLeaveType: string | null
 }
@@ -209,6 +208,10 @@ export interface WebEmpLeaveTypeItem {
   remainingHours: number | null
   useHours: number | null
   descr: string | null
+  createdAt: string | null
+  createdBy: string | null
+  updatedAt: string | null
+  updatedBy: string | null
 }
 
 export interface WebEmpLeaveTypeUpdateRequest {
@@ -225,12 +228,6 @@ export const SET_MODE_OPTIONS = [
   { value: '002', label: '年資轉年假' },
   { value: '003', label: '加班轉補休' },
   { value: '004', label: '生理假' },
-]
-
-export const EMPLOYEE_STYLE_OPTIONS = [
-  { value: '001', label: '兩者' },
-  { value: '002', label: '正式員工' },
-  { value: '003', label: '約聘員工' },
 ]
 
 export const ANNUAL_EFFECTIVE_DATE_OPTIONS = [
@@ -271,16 +268,18 @@ export interface LeaveTypeMasterItem {
   id: number
   chname: string
   enname: string | null
-  sort: number | null
   leaveDefaultFiled: string | null
   leaveSexCondition: string | null
   attachFileHours: number | null
+  createdAt: string | null
+  createdBy: string | null
+  updatedAt: string | null
+  updatedBy: string | null
 }
 
 export interface LeaveTypeMasterUpsertRequest {
   chname: string
   enname?: string
-  sort?: number
   leaveDefaultFiled?: string
   leaveSexCondition?: string
   attachFileHours?: number
@@ -304,6 +303,10 @@ export const LEAVE_SEX_CONDITION_OPTIONS = [
 export interface WorkOvertimeItem {
   id: number
   chName: string
+  createdAt: string | null
+  createdBy: string | null
+  updatedAt: string | null
+  updatedBy: string | null
 }
 
 export interface WorkOvertimeUpsertRequest {
@@ -319,6 +322,16 @@ export interface ComTimeScheduleItem {
   offTime: string | null
   noonBreakStartTime: string | null
   noonBreakEndTime: string | null
+  useCustomLocation: boolean
+  addr: string | null
+  latitude: number | null
+  longitude: number | null
+  punchMethod: string | null
+  gpsRadiusMeters: number | null
+  createdAt: string | null
+  createdBy: string | null
+  updatedAt: string | null
+  updatedBy: string | null
 }
 
 export interface ComTimeScheduleUpsertRequest {
@@ -327,17 +340,27 @@ export interface ComTimeScheduleUpsertRequest {
   offTime?: string
   noonBreakStartTime?: string
   noonBreakEndTime?: string
+  useCustomLocation: boolean
+  addr?: string
+  latitude?: number
+  longitude?: number
+  punchMethod?: string
+  gpsRadiusMeters?: number
 }
 
 export interface EmployeeListItem {
   id: number
   employeenum: string
   chname: string
-  enname: string
   role: string
   roleLabel: string
   jobStatus: string | null
   jobStatusLabel: string | null
+  sex: string | null
+  mobilePhone: string | null
+  takeDate: string | null
+  leaveDate: string | null
+  chargeHeadNum: string | null
   dispatchCaseCode: string | null
 }
 
@@ -345,76 +368,47 @@ export interface EmployeeDetail {
   id: number
   employeenum: string
   chname: string
-  enname: string
   role: string
-  idNum: string
   companyId: number | null
+  companyName: string | null
   dispatchCaseId: number | null
   dispatchCaseCode: string | null
-  nation: string | null
-  birthday: string | null
   sex: string | null
-  marriage: string | null
-  homePhone: string | null
   mobilePhone: string | null
-  contactZipCode: string | null
-  contactAddr: string | null
-  registeredZipCode: string | null
-  registeredAddr: string | null
-  email: string | null
   takeDate: string | null
   leaveDate: string | null
-  jobTitle: string | null
   jobStatus: string | null
-  cardNum: string | null
-  cardDataFrom: string | null
   chargeHeadNum: string | null
   realChargeHeadNum: string | null
-  disabilityLevel: string | null
-  overtimePay: number | null
-  leaveAttachment: number | null
-  memo: string | null
+  createdAt: string | null
+  createdBy: string | null
+  updatedAt: string | null
+  updatedBy: string | null
 }
 
 export interface EmployeeUpsertRequest {
   employeenum?: string
+  companyId?: number
+  dispatchCaseId?: number
   chname: string
-  enname: string
   role: string
-  idNum: string
-  nation?: string
-  birthday?: string
   sex?: string
-  marriage?: string
-  homePhone?: string
   mobilePhone?: string
-  contactZipCode?: string
-  contactAddr?: string
-  registeredZipCode?: string
-  registeredAddr?: string
-  email?: string
   takeDate?: string
   leaveDate?: string
-  jobTitle?: string
   jobStatus?: string
-  cardNum?: string
-  cardDataFrom?: string
   chargeHeadNum?: string
-  disabilityLevel?: string
-  overtimePay?: boolean
-  leaveAttachment?: boolean
-  memo?: string
 }
+
+// 員工的角色只有一般員工/簽核員工兩種(系統管理者/系統使用者是Manager帳號的角色，跟員工分開)。
+export const EMPLOYEE_ROLE_OPTIONS: { value: string; label: string }[] = [
+  { value: '006', label: '一般員工' },
+  { value: '009', label: '簽核員工' },
+]
 
 export const SEX_OPTIONS = [
   { value: '001', label: '男' },
   { value: '002', label: '女' },
-]
-
-export const MARRIAGE_OPTIONS = [
-  { value: '001', label: '未婚' },
-  { value: '002', label: '已婚' },
-  { value: '003', label: '離婚' },
 ]
 
 export const JOB_STATUS_OPTIONS = [

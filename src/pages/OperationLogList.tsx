@@ -80,7 +80,7 @@ export default function OperationLogList() {
       <div style={{ padding: 24 }}>
         <Form form={form} layout="inline" onFinish={onSearch} style={{ marginBottom: 16 }}>
           <Form.Item name="range" label="日期區間">
-            <DatePicker.RangePicker />
+            <DatePicker.RangePicker format="YYYY/MM/DD" />
           </Form.Item>
           <Form.Item name="function" label="功能">
             <Input placeholder="功能名稱" allowClear style={{ width: 160 }} />
