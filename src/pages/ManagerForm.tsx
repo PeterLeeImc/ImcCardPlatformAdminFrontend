@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Form, Input, Layout, Select, Space, Spin, message } from 'antd'
 import { apiClient } from '../api/client'
-import type { ManagerCreateRequest, ManagerDetail, ManagerUpdateRequest } from '../types'
+import type { ManagerCreateRequest, ManagerDetail, ManagerUpdateRequest, SalesLookupResult } from '../types'
 import { ENABLED_OPTIONS, MANAGER_ROLE_OPTIONS } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
 
 const PASSWORD_RULE = /^[a-zA-Z][0-9a-zA-Z]{3,}$/
+const SALES_ROLE = '004'
 
 interface ManagerFormValues {
   account: string
@@ -25,6 +26,8 @@ export default function ManagerForm() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [detail, setDetail] = useState<ManagerDetail>()
+  const [salesSerial, setSalesSerial] = useState('')
+  const [salesLookupLoading, setSalesLookupLoading] = useState(false)
 
   useEffect(() => {
     if (!isEdit) return
@@ -47,6 +50,32 @@ export default function ManagerForm() {
       })
       .finally(() => setLoading(false))
   }, [id, isEdit, form])
+
+  const lookupSales = async () => {
+    if (!salesSerial.trim()) {
+      message.error('請輸入業務代號')
+      return
+    }
+    setSalesLookupLoading(true)
+    try {
+      const res = await apiClient.get<SalesLookupResult>('/admin/managers/lookup-sales', {
+        params: { serial: salesSerial.trim() },
+      })
+      form.setFieldsValue({
+        account: res.data.account,
+        username: res.data.chName,
+        email: res.data.email,
+        role: SALES_ROLE,
+      })
+      form.setFieldValue('enabled', '1')
+      message.success('已帶入IMC業務資料，請確認後再儲存')
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: string } }
+      message.error(axiosErr.response?.data ?? '查詢業務代號失敗')
+    } finally {
+      setSalesLookupLoading(false)
+    }
+  }
 
   const onFinish = async (values: ManagerFormValues) => {
     setSubmitting(true)
@@ -99,6 +128,24 @@ export default function ManagerForm() {
       </div>
       <div style={{ maxWidth: 480, margin: '32px auto', width: '100%', background: '#fff', borderRadius: 12, padding: 32 }}>
         <Spin spinning={loading}>
+          {!isEdit && (
+            <div style={{ marginBottom: 24, padding: 16, background: '#f5f6f8', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>
+                若是新增業務帳號，可先輸入業務代號查詢IMC系統，自動帶入下方帳號/使用者名稱/Email/角色/狀態
+              </div>
+              <Space.Compact style={{ width: '100%' }}>
+                <Input
+                  placeholder="業務代號"
+                  value={salesSerial}
+                  onChange={(e) => setSalesSerial(e.target.value)}
+                  onPressEnter={lookupSales}
+                />
+                <Button onClick={lookupSales} loading={salesLookupLoading}>
+                  查詢
+                </Button>
+              </Space.Compact>
+            </div>
+          )}
           <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ enabled: '1' }}>
             {isEdit ? (
               <Form.Item label="帳號" tooltip="IMC使用者帳號">

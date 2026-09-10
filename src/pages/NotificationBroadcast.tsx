@@ -77,7 +77,7 @@ export default function NotificationBroadcast() {
       >
         <Space>
           <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>通知</span>
+          <span style={{ fontSize: 18, fontWeight: 600 }}>通知廣播</span>
         </Space>
         <Button type="primary" onClick={() => setComposeOpen(true)}>
           發送全客戶廣播

@@ -103,7 +103,7 @@ export default function Home() {
         },
         {
           key: '/notifications',
-          label: '通知',
+          label: '通知廣播',
           desc: '發送全客戶廣播通知',
           icon: <NotificationOutlined style={{ fontSize: 32 }} />,
         },

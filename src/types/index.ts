@@ -42,6 +42,15 @@ export interface ManagerUpdateRequest {
   role: string
 }
 
+/** 新增業務帳號時，依業務代號查詢IMC系統的結果，見ManagerController.lookupSales()。 */
+export interface SalesLookupResult {
+  found: boolean
+  serial: string
+  account: string | null
+  chName: string | null
+  email: string | null
+}
+
 // 使用者(Manager帳號)的角色只能是系統管理者/系統使用者/顧問，一般員工/簽核員工是打卡RWD員工帳號
 // 的角色(見EMPLOYEE_ROLE_OPTIONS)，兩邊角色代碼表雖然共用同一張roles資料表，但下拉選單各自
 // 限定成使用情境對應的子集，不會互相混用。顧問跟系統使用者一樣受資料範圍限制(只能看到自己被指派為
