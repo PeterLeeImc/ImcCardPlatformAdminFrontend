@@ -8,6 +8,8 @@ export interface ManagerListItem {
   enabled: string
   role: string
   roleLabel: string
+  /** 建立業務帳號時查詢IMC系統所用的業務代號，建立後永久唯讀；手動建立的帳號是null。 */
+  salesSerial: string | null
 }
 
 export interface ManagerDetail extends ManagerListItem {
@@ -33,6 +35,7 @@ export interface ManagerCreateRequest {
   email: string
   enabled: string
   role: string
+  salesSerial?: string
 }
 
 export interface ManagerUpdateRequest {
@@ -49,6 +52,15 @@ export interface SalesLookupResult {
   account: string | null
   chName: string | null
   email: string | null
+}
+
+/** 新增客戶時，依客戶編號查詢IMC系統的結果，見CompanyController.lookupCustomer()。 */
+export interface CustomerLookupResult {
+  found: boolean
+  serial: string
+  chName: string | null
+  abbrName: string | null
+  addr: string | null
 }
 
 // 使用者(Manager帳號)的角色只能是系統管理者/系統使用者/顧問，一般員工/簽核員工是打卡RWD員工帳號

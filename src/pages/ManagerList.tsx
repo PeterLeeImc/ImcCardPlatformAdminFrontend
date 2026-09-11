@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Form, Input, Layout, Modal, Space, Table, Tag, message } from 'antd'
+import { Button, Layout, Modal, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
 import type { ManagerListItem, ManagerPage } from '../types'
 import { ENABLED_OPTIONS } from '../types'
 
 const PAGE_SIZE = 20
-const PASSWORD_RULE = /^[a-zA-Z][0-9a-zA-Z]{3,}$/
 
 function enabledLabel(enabled: string): string {
   return ENABLED_OPTIONS.find((o) => o.value === enabled)?.label ?? enabled
@@ -18,9 +17,6 @@ export default function ManagerList() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<ManagerPage>()
   const [page, setPage] = useState(0)
-  const [resetTarget, setResetTarget] = useState<ManagerListItem>()
-  const [resetLoading, setResetLoading] = useState(false)
-  const [resetForm] = Form.useForm<{ newPassword: string }>()
 
   const fetchManagers = useCallback(async (targetPage: number) => {
     setLoading(true)
@@ -60,30 +56,25 @@ export default function ManagerList() {
   }
 
   const openResetPassword = (record: ManagerListItem) => {
-    resetForm.resetFields()
-    setResetTarget(record)
-  }
-
-  const submitResetPassword = async () => {
-    if (!resetTarget) return
-    try {
-      const values = await resetForm.validateFields()
-      setResetLoading(true)
-      await apiClient.post(`/admin/managers/${resetTarget.id}/reset-password`, {
-        newPassword: values.newPassword,
-      })
-      message.success('密碼已重設')
-      setResetTarget(undefined)
-    } catch (err) {
-      if (err && typeof err === 'object' && 'errorFields' in err) {
-        // antd表單驗證未通過，不用額外提示
-        return
-      }
-      const axiosErr = err as { response?: { data?: string } }
-      message.error(axiosErr.response?.data ?? '重設密碼失敗')
-    } finally {
-      setResetLoading(false)
-    }
+    Modal.confirm({
+      title: '確定要重設密碼？',
+      content: (
+        <>
+          帳號：{record.account}
+          <br />
+          預設密碼為帳號，請使用者登入自行變更密碼。
+        </>
+      ),
+      onOk: async () => {
+        try {
+          await apiClient.post(`/admin/managers/${record.id}/reset-password`)
+          message.success('密碼已重設')
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '重設密碼失敗')
+        }
+      },
+    })
   }
 
   const columns: ColumnsType<ManagerListItem> = [
@@ -91,6 +82,12 @@ export default function ManagerList() {
     { title: '使用者名稱', dataIndex: 'username', key: 'username' },
     { title: 'Email', dataIndex: 'email', key: 'email' },
     { title: '角色', dataIndex: 'roleLabel', key: 'roleLabel' },
+    {
+      title: '業務代號',
+      dataIndex: 'salesSerial',
+      key: 'salesSerial',
+      render: (v: string | null) => v ?? '-',
+    },
     {
       title: '狀態',
       dataIndex: 'enabled',
@@ -149,27 +146,6 @@ export default function ManagerList() {
           }}
         />
       </div>
-      <Modal
-        title={`重設密碼${resetTarget ? ` - ${resetTarget.account}` : ''}`}
-        open={!!resetTarget}
-        onCancel={() => setResetTarget(undefined)}
-        onOk={submitResetPassword}
-        confirmLoading={resetLoading}
-        destroyOnHidden
-      >
-        <Form form={resetForm} layout="vertical">
-          <Form.Item
-            name="newPassword"
-            label="新密碼"
-            rules={[
-              { required: true, message: '請輸入新密碼' },
-              { pattern: PASSWORD_RULE, message: '需以英文字母開頭，長度至少4碼，且只能是英文字母或數字' },
-            ]}
-          >
-            <Input.Password placeholder="新密碼" />
-          </Form.Item>
-        </Form>
-      </Modal>
     </Layout>
   )
 }

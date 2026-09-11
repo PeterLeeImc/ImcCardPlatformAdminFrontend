@@ -5,7 +5,7 @@ import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-lea
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { apiClient } from '../api/client'
-import type { CompanyCreateRequest, CompanyDetail, CompanyUpdateRequest } from '../types'
+import type { CompanyCreateRequest, CompanyDetail, CompanyUpdateRequest, CustomerLookupResult } from '../types'
 import { PUNCH_METHOD_OPTIONS } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
 import { shortenAddressCandidates } from '../utils/shortenAddressCandidates'
@@ -85,6 +85,8 @@ export default function CompanyForm() {
   const [savedPosition, setSavedPosition] = useState<[number, number] | null>(null)
   const [pendingPosition, setPendingPosition] = useState<[number, number] | null>(null)
   const [detail, setDetail] = useState<CompanyDetail>()
+  const [customerSerial, setCustomerSerial] = useState('')
+  const [customerLookupLoading, setCustomerLookupLoading] = useState(false)
 
   useEffect(() => {
     if (!isEdit) return
@@ -117,6 +119,31 @@ export default function CompanyForm() {
     if (pendingPosition) {
       setSavedPosition(pendingPosition)
       setPendingPosition(null)
+    }
+  }
+
+  const lookupCustomer = async () => {
+    if (!customerSerial.trim()) {
+      message.error('請輸入客戶編號')
+      return
+    }
+    setCustomerLookupLoading(true)
+    try {
+      const res = await apiClient.get<CustomerLookupResult>('/admin/companies/lookup-customer', {
+        params: { serial: customerSerial.trim() },
+      })
+      form.setFieldsValue({
+        companyNum: res.data.serial,
+        chName: res.data.chName ?? undefined,
+        name4Short: res.data.abbrName ?? undefined,
+        addr: res.data.addr ?? undefined,
+      })
+      message.success('已帶入IMC客戶資料，請確認後再儲存')
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: string } }
+      message.error(axiosErr.response?.data ?? '查詢客戶編號失敗')
+    } finally {
+      setCustomerLookupLoading(false)
     }
   }
 
@@ -208,6 +235,24 @@ export default function CompanyForm() {
       </div>
       <div style={{ maxWidth: 720, margin: '32px auto', width: '100%', background: '#fff', borderRadius: 12, padding: 32 }}>
         <Spin spinning={loading}>
+          {!isEdit && (
+            <div style={{ marginBottom: 24, padding: 16, background: '#f5f6f8', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>
+                可先輸入客戶編號查詢IMC系統，自動帶入下方中文名稱/客戶簡稱/公司地址
+              </div>
+              <Space.Compact style={{ width: '100%' }}>
+                <Input
+                  placeholder="客戶編號"
+                  value={customerSerial}
+                  onChange={(e) => setCustomerSerial(e.target.value)}
+                  onPressEnter={lookupCustomer}
+                />
+                <Button onClick={lookupCustomer} loading={customerLookupLoading}>
+                  查詢
+                </Button>
+              </Space.Compact>
+            </div>
+          )}
           <Form
             form={form}
             layout="vertical"
@@ -234,10 +279,10 @@ export default function CompanyForm() {
             <Form.Item name="name4Short" label="客戶簡稱" rules={[{ required: true, message: '請輸入客戶簡稱' }]}>
               <Input placeholder="客戶簡稱" />
             </Form.Item>
-            <Form.Item label="地址">
+            <Form.Item label="公司地址">
               <Space.Compact style={{ width: '100%' }}>
                 <Form.Item name="addr" noStyle>
-                  <Input placeholder="地址" />
+                  <Input placeholder="公司地址" />
                 </Form.Item>
                 <Button loading={geocoding} onClick={geocodeAddress}>
                   地址轉座標

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Form, Input, Layout, Modal, Select, Space, Table, message } from 'antd'
+import { Button, Input, Layout, Modal, Select, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, EmployeeListItem, LogPage } from '../types'
@@ -26,9 +26,6 @@ export default function EmployeeList() {
   const [data, setData] = useState<LogPage<EmployeeListItem>>()
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [resetTarget, setResetTarget] = useState<EmployeeListItem>()
-  const [resetLoading, setResetLoading] = useState(false)
-  const [resetForm] = Form.useForm<{ newPassword: string }>()
 
   useEffect(() => {
     apiClient
@@ -142,25 +139,25 @@ export default function EmployeeList() {
   }
 
   const openResetPassword = (record: EmployeeListItem) => {
-    resetForm.resetFields()
-    setResetTarget(record)
-  }
-
-  const submitResetPassword = async () => {
-    if (!resetTarget) return
-    try {
-      const values = await resetForm.validateFields()
-      setResetLoading(true)
-      await apiClient.post(`/admin/employees/${resetTarget.id}/reset-password`, { newPassword: values.newPassword })
-      message.success('密碼已重設')
-      setResetTarget(undefined)
-    } catch (err) {
-      if (err && typeof err === 'object' && 'errorFields' in err) return
-      const axiosErr = err as { response?: { data?: string } }
-      message.error(axiosErr.response?.data ?? '重設密碼失敗')
-    } finally {
-      setResetLoading(false)
-    }
+    Modal.confirm({
+      title: '確定要重設密碼？',
+      content: (
+        <>
+          員工編號：{record.employeenum}
+          <br />
+          預設密碼為員工編號，請使用者登入自行變更密碼。
+        </>
+      ),
+      onOk: async () => {
+        try {
+          await apiClient.post(`/admin/employees/${record.id}/reset-password`)
+          message.success('密碼已重設')
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '重設密碼失敗')
+        }
+      },
+    })
   }
 
   const handleDelete = (record: EmployeeListItem) => {
@@ -287,27 +284,6 @@ export default function EmployeeList() {
           }}
         />
       </div>
-      <Modal
-        title={`重設密碼${resetTarget ? ` - ${resetTarget.employeenum}` : ''}`}
-        open={!!resetTarget}
-        onCancel={() => setResetTarget(undefined)}
-        onOk={submitResetPassword}
-        confirmLoading={resetLoading}
-        destroyOnHidden
-      >
-        <Form form={resetForm} layout="vertical">
-          <Form.Item
-            name="newPassword"
-            label="新密碼"
-            rules={[
-              { required: true, message: '請輸入新密碼' },
-              { pattern: /^[a-zA-Z][0-9a-zA-Z]{3,}$/, message: '需以英文字母開頭，長度至少4碼，且只能是英文字母或數字' },
-            ]}
-          >
-            <Input.Password placeholder="新密碼" />
-          </Form.Item>
-        </Form>
-      </Modal>
     </Layout>
   )
 }

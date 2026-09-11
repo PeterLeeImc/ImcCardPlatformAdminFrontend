@@ -36,7 +36,7 @@ export default function ChangePassword() {
         oldPassword: values.oldPassword,
         newPassword: values.newPassword,
       })
-      message.success('密碼已變更，請使用新密碼重新登入')
+      message.success('已變更密碼並自動登出，下次以新密碼登入。')
       logout()
     } catch (err) {
       const axiosErr = err as { response?: { data?: string } }

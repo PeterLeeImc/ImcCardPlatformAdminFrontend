@@ -28,6 +28,7 @@ export default function ManagerForm() {
   const [detail, setDetail] = useState<ManagerDetail>()
   const [salesSerial, setSalesSerial] = useState('')
   const [salesLookupLoading, setSalesLookupLoading] = useState(false)
+  const [confirmedSalesSerial, setConfirmedSalesSerial] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isEdit) return
@@ -62,12 +63,17 @@ export default function ManagerForm() {
         params: { serial: salesSerial.trim() },
       })
       form.setFieldsValue({
-        account: res.data.account,
-        username: res.data.chName,
-        email: res.data.email,
+        account: res.data.account ?? undefined,
+        username: res.data.chName ?? undefined,
+        email: res.data.email ?? undefined,
         role: SALES_ROLE,
+        // 比照這個系統一貫的慣例(新建帳號密碼=帳號本身，見EmployeeController/CardPlatformApiController)，
+        // 密碼預設帶業務帳號，之後登入會被要求強制改密碼。
+        password: res.data.account ?? undefined,
       })
       form.setFieldValue('enabled', '1')
+      // 查詢用的業務代號(確認查到資料後才鎖定)要跟著這個帳號一起儲存，見Manager.salesSerial。
+      setConfirmedSalesSerial(res.data.serial)
       message.success('已帶入IMC業務資料，請確認後再儲存')
     } catch (err) {
       const axiosErr = err as { response?: { data?: string } }
@@ -97,6 +103,7 @@ export default function ManagerForm() {
           email: values.email,
           enabled: values.enabled,
           role: values.role,
+          salesSerial: confirmedSalesSerial ?? undefined,
         }
         await apiClient.post('/admin/managers', body)
         message.success('已新增使用者')
@@ -159,6 +166,16 @@ export default function ManagerForm() {
                 rules={[{ required: true, message: '請輸入帳號' }]}
               >
                 <Input placeholder="帳號" autoComplete="off" />
+              </Form.Item>
+            )}
+            {isEdit && detail?.salesSerial && (
+              <Form.Item label="業務代號" tooltip="建立時查詢IMC系統所用的業務代號，建立後不可修改">
+                <Input value={detail.salesSerial} disabled />
+              </Form.Item>
+            )}
+            {!isEdit && confirmedSalesSerial && (
+              <Form.Item label="業務代號" tooltip="建立後不可修改">
+                <Input value={confirmedSalesSerial} disabled />
               </Form.Item>
             )}
             <Form.Item name="username" label="使用者名稱" rules={[{ required: true, message: '請輸入使用者名稱' }]}>
