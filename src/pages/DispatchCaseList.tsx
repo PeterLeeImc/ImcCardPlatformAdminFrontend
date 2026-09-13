@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Form, Input, Layout, Modal, Select, Space, Switch, Table, message } from 'antd'
+import { Button, Checkbox, Form, Input, Layout, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, DispatchCaseUpsertRequest, LogPage, ManagerOption } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
+import { imcDispatchCaseDetailUrl } from '../utils/imcLinks'
 
 export default function DispatchCaseList() {
   const navigate = useNavigate()
@@ -16,6 +17,7 @@ export default function DispatchCaseList() {
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<DispatchCaseItem | 'new'>()
   const [saving, setSaving] = useState(false)
+  const [includeHidden, setIncludeHidden] = useState(false)
   const [form] = Form.useForm<DispatchCaseUpsertRequest>()
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export default function DispatchCaseList() {
     if (!companyId) return
     setLoading(true)
     apiClient
-      .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
+      .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`, { params: { includeHidden } })
       .then((res) => setRows(res.data))
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
@@ -56,7 +58,7 @@ export default function DispatchCaseList() {
         .catch(() => setManagerOptions([]))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId])
+  }, [companyId, includeHidden])
 
   const openEdit = (row: DispatchCaseItem | 'new') => {
     setEditing(row)
@@ -97,13 +99,15 @@ export default function DispatchCaseList() {
   const handleDelete = (row: DispatchCaseItem) => {
     if (!companyId) return
     Modal.confirm({
-      title: '確定要刪除這個個案？',
-      content: `個案編號：${row.caseCode}`,
+      title: isAdvisorRole() ? '確定要隱藏這個個案？' : '確定要刪除這個個案？',
+      content: isAdvisorRole()
+        ? `個案編號：${row.caseCode}，隱藏後系統管理者/系統使用者可以還原。`
+        : `個案編號：${row.caseCode}`,
       okType: 'danger',
       onOk: async () => {
         try {
           await apiClient.delete(`/admin/companies/${companyId}/dispatch-cases/${row.id}`)
-          message.success('刪除成功')
+          message.success(isAdvisorRole() ? '已隱藏' : '刪除成功')
           fetchRows()
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
@@ -113,8 +117,42 @@ export default function DispatchCaseList() {
     })
   }
 
+  const handleRestore = (row: DispatchCaseItem) => {
+    if (!companyId) return
+    Modal.confirm({
+      title: '確定要還原這個個案？',
+      content: `個案編號：${row.caseCode}`,
+      onOk: async () => {
+        try {
+          await apiClient.post(`/admin/companies/${companyId}/dispatch-cases/${row.id}/restore`)
+          message.success('已還原')
+          fetchRows()
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '還原失敗')
+        }
+      },
+    })
+  }
+
   const columns: ColumnsType<DispatchCaseItem> = [
-    { title: '個案編號', dataIndex: 'caseCode', key: 'caseCode' },
+    {
+      title: '個案編號',
+      dataIndex: 'caseCode',
+      key: 'caseCode',
+      render: (v: string, record) => (
+        <>
+          <a href={imcDispatchCaseDetailUrl(v)} target="_blank" rel="noreferrer">
+            {v}
+          </a>
+          {record.hidden && (
+            <Tag color="default" style={{ marginLeft: 8 }}>
+              已隱藏
+            </Tag>
+          )}
+        </>
+      ),
+    },
     { title: '負責使用者', dataIndex: 'responsibleUserName', key: 'responsibleUserName' },
     {
       title: '加班預設換算',
@@ -129,16 +167,21 @@ export default function DispatchCaseList() {
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => (
-        <Space>
-          <a onClick={() => navigate(`/companies/${companyId}/dispatch-cases/${record.id}/time-schedules`)}>班表</a>
-          <a onClick={() => navigate(`/employees?companyId=${companyId}&dispatchCaseId=${record.id}`)}>員工</a>
-          <a onClick={() => openEdit(record)}>編輯</a>
-          <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-            刪除
-          </a>
-        </Space>
-      ),
+      render: (_, record) =>
+        record.hidden ? (
+          <Space>
+            <a onClick={() => handleRestore(record)}>還原</a>
+          </Space>
+        ) : (
+          <Space>
+            <a onClick={() => navigate(`/time-schedules?companyId=${companyId}&dispatchCaseId=${record.id}`)}>班表</a>
+            <a onClick={() => navigate(`/employees?companyId=${companyId}&dispatchCaseId=${record.id}`)}>員工</a>
+            <a onClick={() => openEdit(record)}>編輯</a>
+            <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
+              刪除
+            </a>
+          </Space>
+        ),
     },
   ]
 
@@ -158,7 +201,7 @@ export default function DispatchCaseList() {
           <a onClick={() => navigate('/')}>首頁</a>
           <span style={{ fontSize: 18, fontWeight: 600 }}>個案維護</span>
         </Space>
-        <Button type="primary" onClick={() => openEdit('new')} disabled={!companyId || isAdvisorRole()}>
+        <Button type="primary" onClick={() => openEdit('new')} disabled={!companyId}>
           新增個案
         </Button>
       </div>
@@ -172,6 +215,11 @@ export default function DispatchCaseList() {
             onChange={setCompanyId}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
           />
+          {!isAdvisorRole() && (
+            <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
+              顯示已隱藏項目
+            </Checkbox>
+          )}
         </Space>
         <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
       </div>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Form, Input, InputNumber, Layout, Modal, Select, Space, Table, message } from 'antd'
+import { Button, Checkbox, Form, Input, InputNumber, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { apiClient } from '../api/client'
+import { apiClient, isAdvisorRole } from '../api/client'
 import {
   LEAVE_DEFAULT_FILED_OPTIONS,
   LEAVE_SEX_CONDITION_OPTIONS,
@@ -21,7 +21,12 @@ export default function LeaveTypeList() {
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<LeaveTypeMasterItem | 'new'>()
   const [saving, setSaving] = useState(false)
+  const [copying, setCopying] = useState(false)
+  const [includeHidden, setIncludeHidden] = useState(false)
   const [form] = Form.useForm<LeaveTypeMasterUpsertRequest>()
+
+  const templateCompany = companies.find((c) => c.template)
+  const canCopyFromTemplate = !!templateCompany && !!companyId && templateCompany.id !== companyId
 
   useEffect(() => {
     apiClient
@@ -39,7 +44,7 @@ export default function LeaveTypeList() {
     if (!companyId) return
     setLoading(true)
     apiClient
-      .get<LeaveTypeMasterItem[]>('/admin/leave-types', { params: { companyId } })
+      .get<LeaveTypeMasterItem[]>('/admin/leave-types', { params: { companyId, includeHidden } })
       .then((res) => setRows(res.data))
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
@@ -51,7 +56,7 @@ export default function LeaveTypeList() {
   useEffect(() => {
     fetchRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId])
+  }, [companyId, includeHidden])
 
   const openEdit = (row: LeaveTypeMasterItem | 'new') => {
     setEditing(row)
@@ -60,7 +65,6 @@ export default function LeaveTypeList() {
     } else {
       form.setFieldsValue({
         chname: row.chname,
-        enname: row.enname ?? undefined,
         leaveDefaultFiled: row.leaveDefaultFiled ?? undefined,
         leaveSexCondition: row.leaveSexCondition ?? undefined,
         attachFileHours: row.attachFileHours ?? undefined,
@@ -91,15 +95,38 @@ export default function LeaveTypeList() {
     }
   }
 
+  const copyFromTemplate = () => {
+    if (!templateCompany || !companyId) return
+    Modal.confirm({
+      title: '確定要從樣板公司複製假別？',
+      content: `樣板公司：${templateCompany.chName}，同名的假別不會重複複製，複製後可自行修改。`,
+      onOk: async () => {
+        setCopying(true)
+        try {
+          const res = await apiClient.post<{ copied: number }>('/admin/leave-types/copy-from-template', null, {
+            params: { companyId },
+          })
+          message.success(`已複製 ${res.data.copied} 筆假別`)
+          fetchRows()
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '複製失敗')
+        } finally {
+          setCopying(false)
+        }
+      },
+    })
+  }
+
   const handleDelete = (row: LeaveTypeMasterItem) => {
     Modal.confirm({
-      title: '確定要刪除這個假別？',
-      content: `假別：${row.chname}`,
+      title: isAdvisorRole() ? '確定要隱藏這個假別？' : '確定要刪除這個假別？',
+      content: isAdvisorRole() ? `假別：${row.chname}，隱藏後系統管理者/系統使用者可以還原。` : `假別：${row.chname}`,
       okType: 'danger',
       onOk: async () => {
         try {
           await apiClient.delete(`/admin/leave-types/${row.id}`)
-          message.success('刪除成功')
+          message.success(isAdvisorRole() ? '已隱藏' : '刪除成功')
           fetchRows()
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
@@ -109,12 +136,42 @@ export default function LeaveTypeList() {
     })
   }
 
+  const handleRestore = (row: LeaveTypeMasterItem) => {
+    Modal.confirm({
+      title: '確定要還原這個假別？',
+      content: `假別：${row.chname}`,
+      onOk: async () => {
+        try {
+          await apiClient.post(`/admin/leave-types/${row.id}/restore`)
+          message.success('已還原')
+          fetchRows()
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '還原失敗')
+        }
+      },
+    })
+  }
+
   const labelOf = (options: { value: string; label: string }[], value: string | null) =>
     options.find((o) => o.value === value)?.label ?? '-'
 
   const columns: ColumnsType<LeaveTypeMasterItem> = [
-    { title: '中文名稱', dataIndex: 'chname', key: 'chname' },
-    { title: '英文名稱', dataIndex: 'enname', key: 'enname' },
+    {
+      title: '假別名稱',
+      dataIndex: 'chname',
+      key: 'chname',
+      render: (v: string, record) => (
+        <>
+          {v}
+          {record.hidden && (
+            <Tag color="default" style={{ marginLeft: 8 }}>
+              已隱藏
+            </Tag>
+          )}
+        </>
+      ),
+    },
     {
       title: '角色代碼',
       dataIndex: 'leaveDefaultFiled',
@@ -131,14 +188,19 @@ export default function LeaveTypeList() {
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => (
-        <Space>
-          <a onClick={() => openEdit(record)}>編輯</a>
-          <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-            刪除
-          </a>
-        </Space>
-      ),
+      render: (_, record) =>
+        record.hidden ? (
+          <Space>
+            <a onClick={() => handleRestore(record)}>還原</a>
+          </Space>
+        ) : (
+          <Space>
+            <a onClick={() => openEdit(record)}>編輯</a>
+            <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
+              刪除
+            </a>
+          </Space>
+        ),
     },
   ]
 
@@ -172,6 +234,14 @@ export default function LeaveTypeList() {
             onChange={setCompanyId}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
           />
+          <Button onClick={copyFromTemplate} loading={copying} disabled={!canCopyFromTemplate}>
+            複製樣板公司假別
+          </Button>
+          {!isAdvisorRole() && (
+            <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
+              顯示已隱藏項目
+            </Checkbox>
+          )}
         </Space>
         <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
       </div>
@@ -184,10 +254,7 @@ export default function LeaveTypeList() {
         destroyOnHidden
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="chname" label="中文名稱" rules={[{ required: true, message: '請輸入中文名稱' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="enname" label="英文名稱">
+          <Form.Item name="chname" label="假別名稱" rules={[{ required: true, message: '請輸入假別名稱' }]}>
             <Input />
           </Form.Item>
           <Form.Item name="leaveDefaultFiled" label="角色代碼" extra="用來讓系統識別這筆假別在流程中的特殊角色，例如客戶配假設定的批次動作要靠這個代碼找到「年假」「補休」對應的假別，不是用名稱比對">

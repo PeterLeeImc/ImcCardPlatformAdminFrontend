@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Form, Input, Layout, Modal, Select, Space, Table, message } from 'antd'
+import { Button, Checkbox, Form, Input, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { apiClient } from '../api/client'
+import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, LogPage, WorkOvertimeItem, WorkOvertimeUpsertRequest } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
 
@@ -14,7 +14,12 @@ export default function WorkOvertimeList() {
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<WorkOvertimeItem | 'new'>()
   const [saving, setSaving] = useState(false)
+  const [copying, setCopying] = useState(false)
+  const [includeHidden, setIncludeHidden] = useState(false)
   const [form] = Form.useForm<WorkOvertimeUpsertRequest>()
+
+  const templateCompany = companies.find((c) => c.template)
+  const canCopyFromTemplate = !!templateCompany && !!companyId && templateCompany.id !== companyId
 
   useEffect(() => {
     apiClient
@@ -32,7 +37,7 @@ export default function WorkOvertimeList() {
     if (!companyId) return
     setLoading(true)
     apiClient
-      .get<WorkOvertimeItem[]>('/admin/work-overtimes', { params: { companyId } })
+      .get<WorkOvertimeItem[]>('/admin/work-overtimes', { params: { companyId, includeHidden } })
       .then((res) => setRows(res.data))
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
@@ -44,7 +49,7 @@ export default function WorkOvertimeList() {
   useEffect(() => {
     fetchRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId])
+  }, [companyId, includeHidden])
 
   const openEdit = (row: WorkOvertimeItem | 'new') => {
     setEditing(row)
@@ -78,15 +83,40 @@ export default function WorkOvertimeList() {
     }
   }
 
+  const copyFromTemplate = () => {
+    if (!templateCompany || !companyId) return
+    Modal.confirm({
+      title: '確定要從樣板公司複製加班別？',
+      content: `樣板公司：${templateCompany.chName}，同名的加班別不會重複複製，複製後可自行修改。`,
+      onOk: async () => {
+        setCopying(true)
+        try {
+          const res = await apiClient.post<{ copied: number }>('/admin/work-overtimes/copy-from-template', null, {
+            params: { companyId },
+          })
+          message.success(`已複製 ${res.data.copied} 筆加班別`)
+          fetchRows()
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '複製失敗')
+        } finally {
+          setCopying(false)
+        }
+      },
+    })
+  }
+
   const handleDelete = (row: WorkOvertimeItem) => {
     Modal.confirm({
-      title: '確定要刪除這個加班別？',
-      content: `加班別：${row.chName}`,
+      title: isAdvisorRole() ? '確定要隱藏這個加班別？' : '確定要刪除這個加班別？',
+      content: isAdvisorRole()
+        ? `加班別：${row.chName}，隱藏後系統管理者/系統使用者可以還原。`
+        : `加班別：${row.chName}`,
       okType: 'danger',
       onOk: async () => {
         try {
           await apiClient.delete(`/admin/work-overtimes/${row.id}`)
-          message.success('刪除成功')
+          message.success(isAdvisorRole() ? '已隱藏' : '刪除成功')
           fetchRows()
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
@@ -96,19 +126,55 @@ export default function WorkOvertimeList() {
     })
   }
 
+  const handleRestore = (row: WorkOvertimeItem) => {
+    Modal.confirm({
+      title: '確定要還原這個加班別？',
+      content: `加班別：${row.chName}`,
+      onOk: async () => {
+        try {
+          await apiClient.post(`/admin/work-overtimes/${row.id}/restore`)
+          message.success('已還原')
+          fetchRows()
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '還原失敗')
+        }
+      },
+    })
+  }
+
   const columns: ColumnsType<WorkOvertimeItem> = [
-    { title: '加班別名稱', dataIndex: 'chName', key: 'chName' },
+    {
+      title: '加班別名稱',
+      dataIndex: 'chName',
+      key: 'chName',
+      render: (v: string, record) => (
+        <>
+          {v}
+          {record.hidden && (
+            <Tag color="default" style={{ marginLeft: 8 }}>
+              已隱藏
+            </Tag>
+          )}
+        </>
+      ),
+    },
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => (
-        <Space>
-          <a onClick={() => openEdit(record)}>編輯</a>
-          <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-            刪除
-          </a>
-        </Space>
-      ),
+      render: (_, record) =>
+        record.hidden ? (
+          <Space>
+            <a onClick={() => handleRestore(record)}>還原</a>
+          </Space>
+        ) : (
+          <Space>
+            <a onClick={() => openEdit(record)}>編輯</a>
+            <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
+              刪除
+            </a>
+          </Space>
+        ),
     },
   ]
 
@@ -142,6 +208,14 @@ export default function WorkOvertimeList() {
             onChange={setCompanyId}
             options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
           />
+          <Button onClick={copyFromTemplate} loading={copying} disabled={!canCopyFromTemplate}>
+            複製樣板公司加班別
+          </Button>
+          {!isAdvisorRole() && (
+            <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
+              顯示已隱藏項目
+            </Checkbox>
+          )}
         </Space>
         <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
       </div>

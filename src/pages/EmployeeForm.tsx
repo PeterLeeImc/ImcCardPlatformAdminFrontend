@@ -3,7 +3,14 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button, DatePicker, Form, Input, Layout, Select, Space, Spin, message } from 'antd'
 import dayjs from 'dayjs'
 import { apiClient } from '../api/client'
-import type { CompanyListItem, DispatchCaseItem, EmployeeDetail, EmployeeUpsertRequest, LogPage } from '../types'
+import type {
+  CompanyListItem,
+  DispatchCaseItem,
+  EmployeeDetail,
+  EmployeeLookupResult,
+  EmployeeUpsertRequest,
+  LogPage,
+} from '../types'
 import { EMPLOYEE_ROLE_OPTIONS, JOB_STATUS_OPTIONS, SEX_OPTIONS } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
 
@@ -36,6 +43,8 @@ export default function EmployeeForm() {
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [newCompanyId, setNewCompanyId] = useState<number>()
   const [newDispatchCases, setNewDispatchCases] = useState<DispatchCaseItem[]>([])
+  const [employeeSerial, setEmployeeSerial] = useState('')
+  const [employeeLookupLoading, setEmployeeLookupLoading] = useState(false)
 
   // 新增員工要先選客戶才知道有哪些派遣個案可選，這裡只在新增模式下載入客戶清單。
   useEffect(() => {
@@ -109,6 +118,31 @@ export default function EmployeeForm() {
     navigate(`/employees?${params.toString()}`)
   }
 
+  const lookupEmployee = async () => {
+    if (!employeeSerial.trim()) {
+      message.error('請輸入員工編號')
+      return
+    }
+    setEmployeeLookupLoading(true)
+    try {
+      const res = await apiClient.get<EmployeeLookupResult>('/admin/employees/lookup-employee', {
+        params: { serial: employeeSerial.trim() },
+      })
+      form.setFieldsValue({
+        employeenum: res.data.serial,
+        chname: res.data.chName ?? undefined,
+        sex: res.data.sex === 'M' ? '001' : res.data.sex === 'F' ? '002' : undefined,
+        takeDate: res.data.takeDate ? dayjs(res.data.takeDate) : undefined,
+      })
+      message.success('已帶入IMC員工資料，請確認後再儲存')
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: string } }
+      message.error(axiosErr.response?.data ?? '查詢員工編號失敗')
+    } finally {
+      setEmployeeLookupLoading(false)
+    }
+  }
+
   const onFinish = async (values: EmployeeFormValues) => {
     setSubmitting(true)
     try {
@@ -162,6 +196,24 @@ export default function EmployeeForm() {
       </div>
       <div style={{ maxWidth: 560, margin: '32px auto', width: '100%', background: '#fff', borderRadius: 12, padding: 32 }}>
         <Spin spinning={loading}>
+          {!isEdit && (
+            <div style={{ marginBottom: 24, padding: 16, background: '#f5f6f8', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>
+                可先輸入員工編號查詢IMC系統，自動帶入下方員工姓名/性別/到職日
+              </div>
+              <Space.Compact style={{ width: '100%' }}>
+                <Input
+                  placeholder="員工編號"
+                  value={employeeSerial}
+                  onChange={(e) => setEmployeeSerial(e.target.value)}
+                  onPressEnter={lookupEmployee}
+                />
+                <Button onClick={lookupEmployee} loading={employeeLookupLoading}>
+                  查詢
+                </Button>
+              </Space.Compact>
+            </div>
+          )}
           <Form
             form={form}
             layout="vertical"
@@ -170,6 +222,9 @@ export default function EmployeeForm() {
           >
             {isEdit ? (
               <>
+                <Form.Item label="員工編號">
+                  <Input value={detail?.employeenum ?? ''} disabled />
+                </Form.Item>
                 <Form.Item label="客戶名稱">
                   <Input value={detail?.companyName ?? ''} disabled />
                 </Form.Item>
@@ -201,7 +256,7 @@ export default function EmployeeForm() {
                 </Form.Item>
               </>
             )}
-            <Form.Item name="chname" label="中文姓名" rules={[{ required: true, message: '請輸入中文姓名' }]}>
+            <Form.Item name="chname" label="員工姓名" rules={[{ required: true, message: '請輸入員工姓名' }]}>
               <Input />
             </Form.Item>
             <Form.Item name="role" label="角色" rules={[{ required: true, message: '請選擇角色' }]}>
@@ -213,7 +268,7 @@ export default function EmployeeForm() {
             <Form.Item name="sex" label="性別">
               <Select options={SEX_OPTIONS} allowClear />
             </Form.Item>
-            <Form.Item name="mobilePhone" label="手機">
+            <Form.Item name="mobilePhone" label="行動電話">
               <Input />
             </Form.Item>
             <Space style={{ width: '100%' }}>

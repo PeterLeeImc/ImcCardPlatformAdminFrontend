@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Layout, Modal, Space, Table, message } from 'antd'
+import { Button, Checkbox, Layout, Modal, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, LogPage } from '../types'
+import { imcCustomerDetailUrl } from '../utils/imcLinks'
 
 const PAGE_SIZE = 20
 
@@ -12,12 +13,13 @@ export default function CompanyList() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<LogPage<CompanyListItem>>()
   const [page, setPage] = useState(0)
+  const [includeHidden, setIncludeHidden] = useState(false)
 
-  const fetchCompanies = useCallback(async (targetPage: number) => {
+  const fetchCompanies = useCallback(async (targetPage: number, showHidden: boolean) => {
     setLoading(true)
     try {
       const res = await apiClient.get<LogPage<CompanyListItem>>('/admin/companies', {
-        params: { page: targetPage, size: PAGE_SIZE },
+        params: { page: targetPage, size: PAGE_SIZE, includeHidden: showHidden },
       })
       setData(res.data)
     } catch (err) {
@@ -29,19 +31,63 @@ export default function CompanyList() {
   }, [])
 
   useEffect(() => {
-    fetchCompanies(page)
-  }, [page, fetchCompanies])
+    fetchCompanies(page, includeHidden)
+  }, [page, includeHidden, fetchCompanies])
+
+  const handleSetTemplate = (record: CompanyListItem) => {
+    Modal.confirm({
+      title: '確定要把這家客戶設為樣板公司？',
+      content: (
+        <>
+          客戶：{record.chName}
+          <br />
+          全系統同一時間只會有一家樣板公司，設定後原本的樣板公司會自動取消。
+          <br />
+          其他客戶可以在「假別維護」「加班別維護」畫面選擇從樣板公司複製設定當起始值。
+        </>
+      ),
+      onOk: async () => {
+        try {
+          await apiClient.post(`/admin/companies/${record.id}/set-template`)
+          message.success('已設為樣板公司')
+          fetchCompanies(page, includeHidden)
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '設定失敗')
+        }
+      },
+    })
+  }
+
+  const handleUnsetTemplate = (record: CompanyListItem) => {
+    Modal.confirm({
+      title: '確定要取消這家客戶的樣板公司標記？',
+      content: `客戶：${record.chName}`,
+      onOk: async () => {
+        try {
+          await apiClient.post(`/admin/companies/${record.id}/unset-template`)
+          message.success('已取消樣板公司標記')
+          fetchCompanies(page, includeHidden)
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '設定失敗')
+        }
+      },
+    })
+  }
 
   const handleDelete = (record: CompanyListItem) => {
     Modal.confirm({
-      title: '確定要刪除這家客戶？',
-      content: `客戶編號：${record.companyNum}`,
+      title: isAdvisorRole() ? '確定要隱藏這家客戶？' : '確定要刪除這家客戶？',
+      content: isAdvisorRole()
+        ? `客戶編號：${record.companyNum}，隱藏後系統管理者/系統使用者可以還原。`
+        : `客戶編號：${record.companyNum}`,
       okType: 'danger',
       onOk: async () => {
         try {
           await apiClient.delete(`/admin/companies/${record.id}`)
-          message.success('刪除成功')
-          fetchCompanies(page)
+          message.success(isAdvisorRole() ? '已隱藏' : '刪除成功')
+          fetchCompanies(page, includeHidden)
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
           message.error(axiosErr.response?.data ?? '刪除失敗')
@@ -50,22 +96,77 @@ export default function CompanyList() {
     })
   }
 
+  const handleRestore = (record: CompanyListItem) => {
+    Modal.confirm({
+      title: '確定要還原這家客戶？',
+      content: `客戶編號：${record.companyNum}`,
+      onOk: async () => {
+        try {
+          await apiClient.post(`/admin/companies/${record.id}/restore`)
+          message.success('已還原')
+          fetchCompanies(page, includeHidden)
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '還原失敗')
+        }
+      },
+    })
+  }
+
   const columns: ColumnsType<CompanyListItem> = [
-    { title: '客戶編號', dataIndex: 'companyNum', key: 'companyNum' },
-    { title: '客戶名稱', dataIndex: 'chName', key: 'chName' },
+    {
+      title: '客戶編號',
+      dataIndex: 'companyNum',
+      key: 'companyNum',
+      render: (v: string) => (
+        <a href={imcCustomerDetailUrl(v)} target="_blank" rel="noreferrer">
+          {v}
+        </a>
+      ),
+    },
+    {
+      title: '客戶名稱',
+      dataIndex: 'chName',
+      key: 'chName',
+      render: (v: string, record) => (
+        <>
+          {v}
+          {record.template && (
+            <Tag color="gold" style={{ marginLeft: 8 }}>
+              樣板公司
+            </Tag>
+          )}
+          {record.hidden && (
+            <Tag color="default" style={{ marginLeft: 8 }}>
+              已隱藏
+            </Tag>
+          )}
+        </>
+      ),
+    },
     { title: '簡稱', dataIndex: 'name4Short', key: 'name4Short' },
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => (
-        <Space size="middle">
-          <a onClick={() => navigate(`/dispatch-cases?companyId=${record.id}`)}>個案維護/班表</a>
-          <a onClick={() => navigate(`/companies/${record.id}`)}>編輯</a>
-          <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-            刪除
-          </a>
-        </Space>
-      ),
+      render: (_, record) =>
+        record.hidden ? (
+          <Space size="middle">
+            <a onClick={() => handleRestore(record)}>還原</a>
+          </Space>
+        ) : (
+          <Space size="middle">
+            <a onClick={() => navigate(`/dispatch-cases?companyId=${record.id}`)}>個案維護/班表</a>
+            <a onClick={() => navigate(`/companies/${record.id}`)}>編輯</a>
+            {record.template ? (
+              <a onClick={() => handleUnsetTemplate(record)}>取消樣板</a>
+            ) : (
+              <a onClick={() => handleSetTemplate(record)}>設為樣板</a>
+            )}
+            <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
+              刪除
+            </a>
+          </Space>
+        ),
     },
   ]
 
@@ -85,11 +186,23 @@ export default function CompanyList() {
           <a onClick={() => navigate('/')}>首頁</a>
           <span style={{ fontSize: 18, fontWeight: 600 }}>客戶維護</span>
         </Space>
-        <Button type="primary" onClick={() => navigate('/companies/new')} disabled={isAdvisorRole()}>
+        <Button type="primary" onClick={() => navigate('/companies/new')}>
           新增客戶
         </Button>
       </div>
       <div style={{ padding: 24 }}>
+        {!isAdvisorRole() && (
+          <Checkbox
+            checked={includeHidden}
+            onChange={(e) => {
+              setIncludeHidden(e.target.checked)
+              setPage(0)
+            }}
+            style={{ marginBottom: 16 }}
+          >
+            顯示已隱藏項目
+          </Checkbox>
+        )}
         <Table
           rowKey="id"
           loading={loading}

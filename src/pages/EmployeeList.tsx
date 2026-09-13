@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Input, Layout, Modal, Select, Space, Table, message } from 'antd'
+import { Button, Checkbox, Input, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, EmployeeListItem, LogPage } from '../types'
 import { JOB_STATUS_OPTIONS, SEX_OPTIONS } from '../types'
 import { formatDate } from '../utils/formatDate'
+import { imcEmployeeDetailUrl } from '../utils/imcLinks'
 
 const PAGE_SIZE = 20
 const SEX_LABELS: Record<string, string> = Object.fromEntries(SEX_OPTIONS.map((o) => [o.value, o.label]))
@@ -26,6 +27,7 @@ export default function EmployeeList() {
   const [data, setData] = useState<LogPage<EmployeeListItem>>()
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [includeHidden, setIncludeHidden] = useState(false)
 
   useEffect(() => {
     apiClient
@@ -83,6 +85,7 @@ export default function EmployeeList() {
           chname: chname || undefined,
           jobStatus: jobStatus || undefined,
           dispatchCaseId,
+          includeHidden,
           page: targetPage,
           size: PAGE_SIZE,
         },
@@ -98,7 +101,7 @@ export default function EmployeeList() {
   useEffect(() => {
     fetchRows(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, dispatchCaseId, page])
+  }, [companyId, dispatchCaseId, includeHidden, page])
 
   const onSearch = () => {
     setPage(0)
@@ -162,13 +165,15 @@ export default function EmployeeList() {
 
   const handleDelete = (record: EmployeeListItem) => {
     Modal.confirm({
-      title: '確定要刪除此員工？',
-      content: `員工編號：${record.employeenum}`,
+      title: isAdvisorRole() ? '確定要隱藏此員工？' : '確定要刪除此員工？',
+      content: isAdvisorRole()
+        ? `員工編號：${record.employeenum}，隱藏後系統管理者/系統使用者可以還原。`
+        : `員工編號：${record.employeenum}`,
       okType: 'danger',
       onOk: async () => {
         try {
           await apiClient.delete(`/admin/employees/${record.id}`)
-          message.success('刪除成功')
+          message.success(isAdvisorRole() ? '已隱藏' : '刪除成功')
           fetchRows(page)
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
@@ -178,28 +183,66 @@ export default function EmployeeList() {
     })
   }
 
+  const handleRestore = (record: EmployeeListItem) => {
+    Modal.confirm({
+      title: '確定要還原此員工？',
+      content: `員工編號：${record.employeenum}`,
+      onOk: async () => {
+        try {
+          await apiClient.post(`/admin/employees/${record.id}/restore`)
+          message.success('已還原')
+          fetchRows(page)
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '還原失敗')
+        }
+      },
+    })
+  }
+
   const columns: ColumnsType<EmployeeListItem> = [
-    { title: '員工編號', dataIndex: 'employeenum', key: 'employeenum' },
-    { title: '中文姓名', dataIndex: 'chname', key: 'chname' },
+    {
+      title: '員工編號',
+      dataIndex: 'employeenum',
+      key: 'employeenum',
+      render: (v: string, record) => (
+        <>
+          <a href={imcEmployeeDetailUrl(v)} target="_blank" rel="noreferrer">
+            {v}
+          </a>
+          {record.hidden && (
+            <Tag color="default" style={{ marginLeft: 8 }}>
+              已隱藏
+            </Tag>
+          )}
+        </>
+      ),
+    },
+    { title: '員工姓名', dataIndex: 'chname', key: 'chname' },
     { title: '角色', dataIndex: 'roleLabel', key: 'roleLabel' },
     { title: '在職狀態', dataIndex: 'jobStatusLabel', key: 'jobStatusLabel' },
     { title: '性別', dataIndex: 'sex', key: 'sex', render: (v: string | null) => (v ? SEX_LABELS[v] ?? v : '-') },
-    { title: '手機', dataIndex: 'mobilePhone', key: 'mobilePhone', render: (v: string | null) => v ?? '-' },
+    { title: '行動電話', dataIndex: 'mobilePhone', key: 'mobilePhone', render: (v: string | null) => v ?? '-' },
     { title: '到職日', dataIndex: 'takeDate', key: 'takeDate', render: formatDate },
     { title: '離職日', dataIndex: 'leaveDate', key: 'leaveDate', render: formatDate },
     { title: '簽核人員工編號', dataIndex: 'chargeHeadNum', key: 'chargeHeadNum', render: (v: string | null) => v ?? '-' },
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => (
-        <Space size="middle">
-          <a onClick={() => navigate(`/employees/${record.id}`)}>編輯</a>
-          <a onClick={() => openResetPassword(record)}>重設密碼</a>
-          <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-            刪除
-          </a>
-        </Space>
-      ),
+      render: (_, record) =>
+        record.hidden ? (
+          <Space size="middle">
+            <a onClick={() => handleRestore(record)}>還原</a>
+          </Space>
+        ) : (
+          <Space size="middle">
+            <a onClick={() => navigate(`/employees/${record.id}`)}>編輯</a>
+            <a onClick={() => openResetPassword(record)}>重設密碼</a>
+            <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
+              刪除
+            </a>
+          </Space>
+        ),
     },
   ]
 
@@ -227,7 +270,7 @@ export default function EmployeeList() {
             if (dispatchCaseId) params.set('dispatchCaseId', String(dispatchCaseId))
             navigate(`/employees/new?${params.toString()}`)
           }}
-          disabled={!companyId || isAdvisorRole()}
+          disabled={!companyId}
         >
           新增員工
         </Button>
@@ -269,6 +312,11 @@ export default function EmployeeList() {
           <Button type="primary" onClick={onSearch}>
             查詢
           </Button>
+          {!isAdvisorRole() && (
+            <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
+              顯示已隱藏項目
+            </Checkbox>
+          )}
         </Space>
         <Table
           rowKey="id"

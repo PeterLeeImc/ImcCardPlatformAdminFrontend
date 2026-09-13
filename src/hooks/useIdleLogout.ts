@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { message } from 'antd'
 import { clearSessionAndRedirectToLogin } from '../api/client'
 
-const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll'] as const
+const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'] as const
 
 /**
  * 閒置達 timeoutMs 沒有任何操作就主動登出、導回登入頁，不等下一次API呼叫才被動觸發401。

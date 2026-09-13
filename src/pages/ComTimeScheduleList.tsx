@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Form, Input, InputNumber, Layout, Modal, Select, Space, Switch, Table, message } from 'antd'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
-import type { ComTimeScheduleItem, ComTimeScheduleUpsertRequest } from '../types'
+import type { CompanyListItem, ComTimeScheduleItem, ComTimeScheduleUpsertRequest, DispatchCaseItem, LogPage } from '../types'
 import { PUNCH_METHOD_OPTIONS } from '../types'
 import { shortenAddressCandidates } from '../utils/shortenAddressCandidates'
 import { formatDateTime } from '../utils/formatDateTime'
@@ -75,9 +75,15 @@ interface ScheduleFormValues {
 
 export default function ComTimeScheduleList() {
   const navigate = useNavigate()
-  const { companyId, dispatchCaseId } = useParams<{ companyId: string; dispatchCaseId: string }>()
+  // 客戶/個案選擇直接以查詢字串為唯一資料來源，比照員工維護的做法，離開頁面再回來時篩選狀態還在。
+  const [searchParams, setSearchParams] = useSearchParams()
+  const companyId = searchParams.get('companyId') ? Number(searchParams.get('companyId')) : undefined
+  const dispatchCaseId = searchParams.get('dispatchCaseId') ? Number(searchParams.get('dispatchCaseId')) : undefined
+  const [companies, setCompanies] = useState<CompanyListItem[]>([])
+  const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
   const [rows, setRows] = useState<ComTimeScheduleItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [copyingFromTemplate, setCopyingFromTemplate] = useState(false)
   const [editing, setEditing] = useState<ComTimeScheduleItem | 'new'>()
   const [saving, setSaving] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
@@ -86,9 +92,66 @@ export default function ComTimeScheduleList() {
   const [useCustomLocation, setUseCustomLocation] = useState(false)
   const [form] = Form.useForm<ScheduleFormValues>()
 
+  const templateCompany = companies.find((c) => c.template)
+  const canCopyFromTemplate = !!templateCompany && !!companyId && templateCompany.id !== companyId
+
   const basePath = `/admin/companies/${companyId}/dispatch-cases/${dispatchCaseId}/time-schedules`
 
+  useEffect(() => {
+    apiClient
+      .get<LogPage<CompanyListItem>>('/admin/companies', { params: { page: 0, size: 200 } })
+      .then((res) => {
+        setCompanies(res.data.content)
+        if (companyId && res.data.content.some((c) => c.id === companyId)) {
+          return
+        }
+        if (res.data.content.length > 0) {
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev)
+              next.set('companyId', String(res.data.content[0].id))
+              next.delete('dispatchCaseId')
+              return next
+            },
+            { replace: true },
+          )
+        }
+      })
+      .catch(() => message.error('載入客戶清單失敗'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!companyId) return
+    apiClient
+      .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
+      .then((res) => {
+        setDispatchCases(res.data)
+        if (dispatchCaseId && res.data.some((d) => d.id === dispatchCaseId)) {
+          return
+        }
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            if (res.data.length > 0) {
+              next.set('dispatchCaseId', String(res.data[0].id))
+            } else {
+              next.delete('dispatchCaseId')
+            }
+            return next
+          },
+          { replace: true },
+        )
+      })
+      .catch(() => setDispatchCases([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId])
+
   const fetchRows = () => {
+    if (!companyId || !dispatchCaseId) {
+      setRows([])
+      return
+    }
     setLoading(true)
     apiClient
       .get<ComTimeScheduleItem[]>(basePath)
@@ -104,6 +167,58 @@ export default function ComTimeScheduleList() {
     fetchRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, dispatchCaseId])
+
+  const changeCompany = (v: number | undefined) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (v) {
+          next.set('companyId', String(v))
+        } else {
+          next.delete('companyId')
+        }
+        next.delete('dispatchCaseId')
+        return next
+      },
+      { replace: true },
+    )
+  }
+
+  const changeDispatchCase = (v: number | undefined) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (v) {
+          next.set('dispatchCaseId', String(v))
+        } else {
+          next.delete('dispatchCaseId')
+        }
+        return next
+      },
+      { replace: true },
+    )
+  }
+
+  const copyFromTemplate = () => {
+    if (!templateCompany || !companyId || !dispatchCaseId) return
+    Modal.confirm({
+      title: '確定要從樣板公司的個案複製班表？',
+      content: `樣板公司：${templateCompany.chName}，同班別代碼的班表不會重複複製，複製後可自行修改。`,
+      onOk: async () => {
+        setCopyingFromTemplate(true)
+        try {
+          const res = await apiClient.post<{ copied: number }>(`${basePath}/copy-from-template`)
+          message.success(`已複製 ${res.data.copied} 筆班表`)
+          fetchRows()
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '複製失敗')
+        } finally {
+          setCopyingFromTemplate(false)
+        }
+      },
+    })
+  }
 
   const openEdit = (row: ComTimeScheduleItem | 'new') => {
     setEditing(row)
@@ -173,7 +288,7 @@ export default function ComTimeScheduleList() {
   }
 
   const submitEdit = async () => {
-    if (!editing) return
+    if (!editing || !companyId || !dispatchCaseId) return
     try {
       const values = await form.validateFields()
       const body: ComTimeScheduleUpsertRequest = {
@@ -322,15 +437,36 @@ export default function ComTimeScheduleList() {
         }}
       >
         <Space>
-          <a onClick={() => navigate('/companies')}>客戶維護</a>
-          <a onClick={() => navigate('/dispatch-cases')}>個案維護</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>班表內容</span>
+          <a onClick={() => navigate('/')}>首頁</a>
+          <span style={{ fontSize: 18, fontWeight: 600 }}>班表維護</span>
         </Space>
-        <Button type="primary" onClick={() => openEdit('new')}>
+        <Button type="primary" onClick={() => openEdit('new')} disabled={!dispatchCaseId}>
           新增班表
         </Button>
       </div>
       <div style={{ padding: 24 }}>
+        <Space style={{ marginBottom: 16 }} wrap>
+          <span>選擇客戶：</span>
+          <Select
+            style={{ width: 240 }}
+            placeholder="選擇客戶"
+            value={companyId}
+            onChange={changeCompany}
+            options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+          />
+          <span>選擇個案：</span>
+          <Select
+            style={{ width: 200 }}
+            placeholder={companyId ? '選擇個案' : '請先選擇客戶'}
+            disabled={!companyId}
+            value={dispatchCaseId}
+            onChange={changeDispatchCase}
+            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
+          />
+          <Button onClick={copyFromTemplate} loading={copyingFromTemplate} disabled={!canCopyFromTemplate}>
+            複製樣板公司個案班表
+          </Button>
+        </Space>
         <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
       </div>
       <Modal

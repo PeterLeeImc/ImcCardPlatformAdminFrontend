@@ -1,5 +1,7 @@
 import type React from 'react'
+import { useEffect } from 'react'
 import { Navigate, Route, BrowserRouter, Routes, useLocation } from 'react-router-dom'
+import { loadAdminConfig } from './api/config'
 import Login from './pages/Login'
 import ChangePassword from './pages/ChangePassword'
 import Home from './pages/Home'
@@ -45,6 +47,12 @@ function RequireAuth({ children }: { children: React.ReactElement }) {
 }
 
 export default function App() {
+  useEffect(() => {
+    if (localStorage.getItem('platformToken')) {
+      loadAdminConfig()
+    }
+  }, [])
+
   return (
     // basename跟著vite.config.ts的base走：本機dev是"/"，正式打包是"/ImcCardPlatformAdmin/"，
     // 部署在非根路徑時React Router才能正確比對目前網址對應到哪個路由(不然/employees這種路由
@@ -237,7 +245,7 @@ export default function App() {
           }
         />
         <Route
-          path="/companies/:companyId/dispatch-cases/:dispatchCaseId/time-schedules"
+          path="/time-schedules"
           element={
             <RequireAuth>
               <ComTimeScheduleList />

@@ -63,6 +63,18 @@ export interface CustomerLookupResult {
   addr: string | null
 }
 
+/** 新增員工時，依員工編號查詢IMC系統的結果，見EmployeeController.lookupEmployee()。 */
+export interface EmployeeLookupResult {
+  found: boolean
+  serial: string
+  chName: string | null
+  /** "M"=男/"F"=女/空字串=未知 */
+  sex: string | null
+  idNum: string | null
+  /** yyyy-MM-dd */
+  takeDate: string | null
+}
+
 // 使用者(Manager帳號)的角色只能是系統管理者/系統使用者/顧問，一般員工/簽核員工是打卡RWD員工帳號
 // 的角色(見EMPLOYEE_ROLE_OPTIONS)，兩邊角色代碼表雖然共用同一張roles資料表，但下拉選單各自
 // 限定成使用情境對應的子集，不會互相混用。顧問跟系統使用者一樣受資料範圍限制(只能看到自己被指派為
@@ -147,6 +159,10 @@ export interface CompanyListItem {
   companyNum: string
   chName: string
   name4Short: string
+  /** 樣板公司：全系統同一時間只會有一家，見CompanyController.setTemplate()。 */
+  template: boolean
+  /** 顧問角色刪除只是隱藏(軟刪除)，系統管理者/系統使用者可以還原或真的刪除。 */
+  hidden: boolean
 }
 
 export interface CompanyDetail {
@@ -159,6 +175,8 @@ export interface CompanyDetail {
   longitude: number | null
   punchMethod: string | null
   gpsRadiusMeters: number | null
+  template: boolean
+  hidden: boolean
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null
@@ -265,6 +283,7 @@ export interface DispatchCaseItem {
   responsibleUserId: number | null
   responsibleUserName: string | null
   defaultOvertimeChangeToCompTime: boolean
+  hidden: boolean
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null
@@ -292,6 +311,7 @@ export interface LeaveTypeMasterItem {
   leaveDefaultFiled: string | null
   leaveSexCondition: string | null
   attachFileHours: number | null
+  hidden: boolean
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null
@@ -324,6 +344,7 @@ export const LEAVE_SEX_CONDITION_OPTIONS = [
 export interface WorkOvertimeItem {
   id: number
   chName: string
+  hidden: boolean
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null
@@ -383,6 +404,7 @@ export interface EmployeeListItem {
   leaveDate: string | null
   chargeHeadNum: string | null
   dispatchCaseCode: string | null
+  hidden: boolean
 }
 
 export interface EmployeeDetail {
@@ -401,6 +423,7 @@ export interface EmployeeDetail {
   jobStatus: string | null
   chargeHeadNum: string | null
   realChargeHeadNum: string | null
+  hidden: boolean
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null

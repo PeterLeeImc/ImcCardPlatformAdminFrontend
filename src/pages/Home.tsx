@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Layout, Space, Spin } from 'antd'
-import { apiClient } from '../api/client'
+import { Card, Input, Layout, Modal, Space, Spin, message } from 'antd'
+import { apiClient, clearSessionAndRedirectToLogin, isSystemAdminRole } from '../api/client'
 import {
   TeamOutlined,
   SafetyCertificateOutlined,
@@ -21,8 +21,11 @@ import {
   AppstoreOutlined,
   ImportOutlined,
   ScheduleOutlined,
+  DatabaseOutlined,
+  TableOutlined,
 } from '@ant-design/icons'
-import { clearSessionAndRedirectToLogin } from '../api/client'
+
+const RESET_CONFIRM_TEXT = 'RESET'
 
 export default function Home() {
   const navigate = useNavigate()
@@ -35,12 +38,41 @@ export default function Home() {
   }
 
   const [permissions, setPermissions] = useState<Set<string>>()
+  const [resetModalOpen, setResetModalOpen] = useState(false)
+  const [resetConfirmText, setResetConfirmText] = useState('')
+  const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
     apiClient.get<string[]>('/auth/admin-permissions').then((res) => {
       setPermissions(new Set(res.data))
     })
   }, [])
+
+  const openResetDatabase = () => {
+    setResetConfirmText('')
+    setResetModalOpen(true)
+  }
+
+  const confirmResetDatabase = async () => {
+    setResetting(true)
+    try {
+      const res = await apiClient.post<{ templatePreserved: boolean; templateCompanyName: string | null }>(
+        '/admin/reset-database',
+      )
+      message.success(
+        res.data.templatePreserved
+          ? `資料庫已還原成初始狀態(保留樣板公司「${res.data.templateCompanyName}」)，即將登出，請重新登入`
+          : '資料庫已還原成初始狀態，即將登出，請重新登入',
+      )
+      setResetModalOpen(false)
+      clearSessionAndRedirectToLogin()
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: string } }
+      message.error(axiosErr.response?.data ?? '還原失敗')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   const allTiers = [
     {
@@ -59,6 +91,13 @@ export default function Home() {
           label: '個案維護',
           desc: '客戶底下的派遣個案清單、負責使用者、班表內容(同客戶不同個案可各自設定班表)',
           icon: <ApartmentOutlined style={{ fontSize: 32 }} />,
+        },
+        {
+          key: '/time-schedules',
+          rightName: '維護作業|員工維護',
+          label: '班表維護',
+          desc: '派遣個案的班別時段/打卡地點設定',
+          icon: <TableOutlined style={{ fontSize: 32 }} />,
         },
         {
           key: '/employees',
@@ -230,6 +269,19 @@ export default function Home() {
               flexWrap: 'wrap',
             }}
           >
+            {tier.items.some((i) => i.key === '/managers') && isSystemAdminRole() && (
+              <Card hoverable onClick={openResetDatabase} style={{ width: 260, borderColor: '#ff4d4f' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ color: '#ff4d4f' }}>
+                    <DatabaseOutlined style={{ fontSize: 32 }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: '#ff4d4f' }}>預設資料庫</div>
+                    <div style={{ fontSize: 13, color: '#999' }}>清空測試資料，還原成初始狀態</div>
+                  </div>
+                </div>
+              </Card>
+            )}
             {tier.items.map((item) => (
               <Card
                 key={item.key}
@@ -250,6 +302,34 @@ export default function Home() {
           ))
         )}
       </div>
+      <Modal
+        title="還原資料庫為初始狀態"
+        open={resetModalOpen}
+        onCancel={() => setResetModalOpen(false)}
+        onOk={confirmResetDatabase}
+        confirmLoading={resetting}
+        okButtonProps={{ danger: true, disabled: resetConfirmText !== RESET_CONFIRM_TEXT }}
+        okText="確定還原"
+        destroyOnHidden
+      >
+        <p>
+          這個操作會<b>清空所有客戶、員工、派遣個案、假別、配假、加班別、排班、打卡、請假、加班、通知、
+          操作紀錄、登入紀錄</b>等資料，只保留 imcPeter 這一個使用者帳號，角色權限設定不受影響。
+        </p>
+        <p>如果有設定樣板公司，這家公司連同底下的個案/員工/假別/加班別/排班等資料會一併保留，不會被清空。</p>
+        <p style={{ color: '#ff4d4f' }}>此操作無法復原，執行後會立即登出，請確認是本機測試環境再繼續。</p>
+        <p>
+          請輸入 <b>{RESET_CONFIRM_TEXT}</b> 以確認：
+        </p>
+        <Input
+          value={resetConfirmText}
+          onChange={(e) => setResetConfirmText(e.target.value)}
+          placeholder={RESET_CONFIRM_TEXT}
+          onPressEnter={() => {
+            if (resetConfirmText === RESET_CONFIRM_TEXT) confirmResetDatabase()
+          }}
+        />
+      </Modal>
     </Layout>
   )
 }

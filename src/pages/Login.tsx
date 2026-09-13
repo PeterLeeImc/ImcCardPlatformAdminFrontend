@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Form, Input, message, Modal } from 'antd'
 import { apiClient } from '../api/client'
+import { loadAdminConfig } from '../api/config'
 
 interface LoginFormValues {
   employeenum: string
@@ -57,6 +58,7 @@ export default function Login() {
       localStorage.removeItem('platformOperatingCompanyId')
       localStorage.removeItem('platformOperatingCompanyName')
     }
+    loadAdminConfig()
     navigate(res.data.mustChangePassword ? '/change-password' : '/')
   }
 
