@@ -6,6 +6,7 @@ import {
   DatePicker,
   Form,
   Input,
+  InputNumber,
   Layout,
   Modal,
   Space,
@@ -23,7 +24,7 @@ import { formatDateTime } from '../utils/formatDateTime'
 import { compareDates, compareStrings } from '../utils/tableSort'
 
 const PAGE_SIZE = 50
-const CURRENT_YEAR = String(new Date().getFullYear())
+const today = new Date()
 const DATE_FORMAT = 'YYYY/MM/DD'
 
 interface ImportResult {
@@ -33,7 +34,9 @@ interface ImportResult {
 
 export default function HolidayList() {
   const navigate = useNavigate()
-  const [year, setYear] = useState(CURRENT_YEAR)
+  const [year, setYear] = useState(today.getFullYear())
+  // 月份留空代表查整年，比照後端HolidayController.list()「有年度、月份選填」的既定規則。
+  const [month, setMonth] = useState<number>()
   const [data, setData] = useState<LogPage<HolidayItem>>()
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -49,7 +52,7 @@ export default function HolidayList() {
   const fetchRows = (targetPage: number) => {
     setLoading(true)
     apiClient
-      .get<LogPage<HolidayItem>>('/admin/holidays', { params: { year, page: targetPage, size: PAGE_SIZE } })
+      .get<LogPage<HolidayItem>>('/admin/holidays', { params: { year, month, page: targetPage, size: PAGE_SIZE } })
       .then((res) => setData(res.data))
       .catch(() => message.error('載入假日檔失敗'))
       .finally(() => setLoading(false))
@@ -58,7 +61,7 @@ export default function HolidayList() {
   useEffect(() => {
     fetchRows(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, page])
+  }, [year, month, page])
 
   const openEdit = (row: HolidayItem | 'new') => {
     setEditing(row)
@@ -274,14 +277,26 @@ export default function HolidayList() {
         </div>
 
         <Space style={{ marginBottom: 16 }}>
-          <Input
-            style={{ width: 120 }}
+          <InputNumber
             value={year}
-            onChange={(e) => {
-              setYear(e.target.value)
+            onChange={(v) => {
+              setYear(v ?? today.getFullYear())
               setPage(0)
             }}
-            placeholder="年度"
+            style={{ width: 100 }}
+            addonAfter="年"
+          />
+          <InputNumber
+            value={month}
+            min={1}
+            max={12}
+            onChange={(v) => {
+              setMonth(v ?? undefined)
+              setPage(0)
+            }}
+            style={{ width: 90 }}
+            addonAfter="月"
+            placeholder="全年"
           />
         </Space>
         <Table
