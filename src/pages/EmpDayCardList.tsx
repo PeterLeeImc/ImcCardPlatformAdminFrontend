@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { Button, InputNumber, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
-import type { CompanyListItem, EmpDayCardRow, EmployeeListItem, LogPage } from '../types'
+import type { CompanyListItem, DispatchCaseItem, EmpDayCardRow, EmployeeListItem, LogPage } from '../types'
 import { formatDate } from '../utils/formatDate'
+import { compareDates, compareNumericLabels, compareStrings } from '../utils/tableSort'
 
 const ALL_EMPLOYEES = 0
 const WHOLE_MONTH = 0
@@ -14,6 +15,8 @@ export default function EmpDayCardList() {
   const navigate = useNavigate()
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [companyId, setCompanyId] = useState<number>()
+  const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
+  const [dispatchCaseId, setDispatchCaseId] = useState<number>()
   const [employees, setEmployees] = useState<EmployeeListItem[]>([])
   const [employeeId, setEmployeeId] = useState<number>(ALL_EMPLOYEES)
   const [year, setYear] = useState(today.getFullYear())
@@ -35,13 +38,31 @@ export default function EmpDayCardList() {
       .catch(() => message.error('載入客戶清單失敗'))
   }, [])
 
+  // 選擇客戶改變時，重置個案/員工，並重新載入這家客戶的派遣個案清單。
   useEffect(() => {
+    setDispatchCaseId(undefined)
+    setDispatchCases([])
+    setEmployeeId(ALL_EMPLOYEES)
     if (!companyId) return
     apiClient
-      .get<LogPage<EmployeeListItem>>('/admin/employees', { params: { companyId, page: 0, size: 500 } })
+      .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
+      .then((res) => setDispatchCases(res.data))
+      .catch(() => setDispatchCases([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId])
+
+  // 選擇個案改變時，重置員工，並依目前的客戶+個案重新載入員工清單(個案未選時只依客戶篩選)。
+  useEffect(() => {
+    setEmployeeId(ALL_EMPLOYEES)
+    if (!companyId) return
+    apiClient
+      .get<LogPage<EmployeeListItem>>('/admin/employees', {
+        params: { companyId, dispatchCaseId, page: 0, size: 500 },
+      })
       .then((res) => setEmployees(res.data.content))
       .catch(() => setEmployees([]))
-  }, [companyId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId, dispatchCaseId])
 
   const fetchRows = () => {
     if (!companyId) return
@@ -80,25 +101,69 @@ export default function EmpDayCardList() {
   }
 
   const columns: ColumnsType<EmpDayCardRow> = [
-    { title: '員工編號', dataIndex: 'employeeNum', key: 'employeeNum' },
-    { title: '姓名', dataIndex: 'employeeChname', key: 'employeeChname' },
-    { title: '日期', dataIndex: 'rowDate', key: 'rowDate', render: formatDate },
-    { title: '班別', dataIndex: 'workTypeLabel', key: 'workTypeLabel' },
-    { title: '班表時段', dataIndex: 'scheduleTimeLabel', key: 'scheduleTimeLabel' },
+    {
+      title: '員工編號',
+      dataIndex: 'employeeNum',
+      key: 'employeeNum',
+      render: (v: string, record) => (record.dispatchCaseCode ? `${record.dispatchCaseCode}/${v}` : v),
+      sorter: (a, b) => compareStrings(a.employeeNum, b.employeeNum),
+    },
+    {
+      title: '姓名',
+      dataIndex: 'employeeChname',
+      key: 'employeeChname',
+      sorter: (a, b) => compareStrings(a.employeeChname, b.employeeChname),
+    },
+    {
+      title: '日期',
+      dataIndex: 'rowDate',
+      key: 'rowDate',
+      render: formatDate,
+      sorter: (a, b) => compareDates(a.rowDate, b.rowDate),
+    },
+    {
+      title: '班別',
+      dataIndex: 'workTypeLabel',
+      key: 'workTypeLabel',
+      sorter: (a, b) => compareStrings(a.workTypeLabel, b.workTypeLabel),
+    },
+    {
+      title: '班表時段',
+      dataIndex: 'scheduleTimeLabel',
+      key: 'scheduleTimeLabel',
+      sorter: (a, b) => compareStrings(a.scheduleTimeLabel, b.scheduleTimeLabel),
+    },
     {
       title: '狀態',
       dataIndex: 'punchedLabel',
       key: 'punchedLabel',
       render: (v: string, record) => <Tag color={record.punched ? 'blue' : 'red'}>{v}</Tag>,
+      sorter: (a, b) => compareStrings(a.punchedLabel, b.punchedLabel),
     },
-    { title: '上班打卡', dataIndex: 'startTimeLabel', key: 'startTimeLabel' },
-    { title: '下班打卡', dataIndex: 'endTimeLabel', key: 'endTimeLabel' },
-    { title: '有效工時', dataIndex: 'effectiveHoursLabel', key: 'effectiveHoursLabel' },
+    {
+      title: '上班打卡',
+      dataIndex: 'startTimeLabel',
+      key: 'startTimeLabel',
+      sorter: (a, b) => compareStrings(a.startTimeLabel, b.startTimeLabel),
+    },
+    {
+      title: '下班打卡',
+      dataIndex: 'endTimeLabel',
+      key: 'endTimeLabel',
+      sorter: (a, b) => compareStrings(a.endTimeLabel, b.endTimeLabel),
+    },
+    {
+      title: '有效工時',
+      dataIndex: 'effectiveHoursLabel',
+      key: 'effectiveHoursLabel',
+      sorter: (a, b) => compareNumericLabels(a.effectiveHoursLabel, b.effectiveHoursLabel),
+    },
     {
       title: '定位',
       key: 'location',
       render: (_, record) =>
         record.locationValid == null ? '' : <Tag color={record.locationValid ? 'blue' : 'red'}>{record.locationValid ? '範圍內' : '超出範圍'}</Tag>,
+      sorter: (a, b) => compareStrings(String(a.locationValid ?? ''), String(b.locationValid ?? '')),
     },
     {
       title: '照片',
@@ -136,12 +201,25 @@ export default function EmpDayCardList() {
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
           <Select
-            style={{ width: 240 }}
+            style={{ width: 360 }}
             placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
-            options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+            options={companies.map((c) => ({
+              value: c.id,
+              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+            }))}
           />
+          <span>選擇個案：</span>
+          <Select
+            style={{ width: 200 }}
+            placeholder="個案(全部)"
+            allowClear
+            value={dispatchCaseId}
+            onChange={setDispatchCaseId}
+            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
+          />
+          <span>選擇員工：</span>
           <Select
             style={{ width: 200 }}
             value={employeeId}

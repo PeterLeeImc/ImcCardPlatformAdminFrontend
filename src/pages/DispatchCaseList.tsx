@@ -6,6 +6,7 @@ import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, DispatchCaseUpsertRequest, LogPage, ManagerOption } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
 import { imcDispatchCaseDetailUrl } from '../utils/imcLinks'
+import { compareDates, compareStrings } from '../utils/tableSort'
 
 export default function DispatchCaseList() {
   const navigate = useNavigate()
@@ -68,7 +69,9 @@ export default function DispatchCaseList() {
       form.setFieldsValue({
         caseCode: row.caseCode,
         responsibleUserId: row.responsibleUserId ?? undefined,
+        useCustomSchedule: row.useCustomSchedule,
         defaultOvertimeChangeToCompTime: row.defaultOvertimeChangeToCompTime,
+        descr: row.descr ?? undefined,
       })
     }
   }
@@ -152,18 +155,64 @@ export default function DispatchCaseList() {
           )}
         </>
       ),
+      sorter: (a, b) => compareStrings(a.caseCode, b.caseCode),
     },
-    { title: '負責使用者', dataIndex: 'responsibleUserName', key: 'responsibleUserName' },
+    {
+      title: '負責使用者',
+      dataIndex: 'responsibleUserName',
+      key: 'responsibleUserName',
+      sorter: (a, b) => compareStrings(a.responsibleUserName, b.responsibleUserName),
+    },
+    {
+      title: '班段採首筆班表或每月自訂',
+      dataIndex: 'useCustomSchedule',
+      key: 'useCustomSchedule',
+      render: (v: boolean) => (v ? '每月自訂' : '首筆班表'),
+      sorter: (a, b) =>
+        compareStrings(a.useCustomSchedule ? '每月自訂' : '首筆班表', b.useCustomSchedule ? '每月自訂' : '首筆班表'),
+    },
     {
       title: '加班預設換算',
       dataIndex: 'defaultOvertimeChangeToCompTime',
       key: 'defaultOvertimeChangeToCompTime',
       render: (v: boolean) => (v ? '補休' : '加班費(現金)'),
+      sorter: (a, b) =>
+        compareStrings(a.defaultOvertimeChangeToCompTime ? '補休' : '加班費(現金)', b.defaultOvertimeChangeToCompTime ? '補休' : '加班費(現金)'),
     },
-    { title: '建立時間', dataIndex: 'createdAt', key: 'createdAt', render: formatDateTime },
-    { title: '建立者', dataIndex: 'createdBy', key: 'createdBy' },
-    { title: '異動時間', dataIndex: 'updatedAt', key: 'updatedAt', render: formatDateTime },
-    { title: '異動者', dataIndex: 'updatedBy', key: 'updatedBy' },
+    {
+      title: '備註',
+      dataIndex: 'descr',
+      key: 'descr',
+      ellipsis: true,
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.descr, b.descr),
+    },
+    {
+      title: '建立時間',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: formatDateTime,
+      sorter: (a, b) => compareDates(a.createdAt, b.createdAt),
+    },
+    {
+      title: '建立者',
+      dataIndex: 'createdBy',
+      key: 'createdBy',
+      sorter: (a, b) => compareStrings(a.createdBy, b.createdBy),
+    },
+    {
+      title: '異動時間',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      render: formatDateTime,
+      sorter: (a, b) => compareDates(a.updatedAt, b.updatedAt),
+    },
+    {
+      title: '異動者',
+      dataIndex: 'updatedBy',
+      key: 'updatedBy',
+      sorter: (a, b) => compareStrings(a.updatedBy, b.updatedBy),
+    },
     {
       title: '操作',
       key: 'action',
@@ -209,11 +258,14 @@ export default function DispatchCaseList() {
         <Space style={{ marginBottom: 16 }}>
           <span>選擇客戶：</span>
           <Select
-            style={{ width: 240 }}
+            style={{ width: 360 }}
             placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
-            options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+            options={companies.map((c) => ({
+              value: c.id,
+              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+            }))}
           />
           {!isAdvisorRole() && (
             <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
@@ -245,6 +297,15 @@ export default function DispatchCaseList() {
             />
           </Form.Item>
           <Form.Item
+            name="useCustomSchedule"
+            label="班段採首筆班表或每月自訂"
+            valuePropName="checked"
+            tooltip="首筆班表：固定套用這個派遣個案的第一筆班表；每月自訂：每個月自行安排班段"
+            initialValue={false}
+          >
+            <Switch checkedChildren="每月自訂" unCheckedChildren="首筆班表" />
+          </Form.Item>
+          <Form.Item
             name="defaultOvertimeChangeToCompTime"
             label="加班申請核准後預設換算方式"
             valuePropName="checked"
@@ -252,6 +313,9 @@ export default function DispatchCaseList() {
             initialValue={false}
           >
             <Switch checkedChildren="換算成補休" unCheckedChildren="換算成加班費(現金)" />
+          </Form.Item>
+          <Form.Item name="descr" label="備註">
+            <Input.TextArea placeholder="備註" rows={3} />
           </Form.Item>
         </Form>
         {editing && editing !== 'new' && (

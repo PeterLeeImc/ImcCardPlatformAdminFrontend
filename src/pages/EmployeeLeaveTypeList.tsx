@@ -14,6 +14,7 @@ import type {
 } from '../types'
 import { formatDate } from '../utils/formatDate'
 import { formatDateTime } from '../utils/formatDateTime'
+import { compareDates, compareNumbers, compareStrings } from '../utils/tableSort'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
 const PAGE_SIZE = 20
@@ -129,14 +130,64 @@ export default function EmployeeLeaveTypeList() {
   }
 
   const columns: ColumnsType<WebEmpLeaveTypeItem> = [
-    { title: '員工編號', dataIndex: 'employeeNum', key: 'employeeNum' },
-    { title: '姓名', dataIndex: 'employeeChname', key: 'employeeChname' },
-    { title: '假別', dataIndex: 'leaveTypeName', key: 'leaveTypeName' },
-    { title: '起日', dataIndex: 'startDate', key: 'startDate', render: formatDate },
-    { title: '迄日', dataIndex: 'endDate', key: 'endDate', render: formatDate },
-    { title: '總額度', dataIndex: 'availableHours', key: 'availableHours' },
-    { title: '剩餘時數', dataIndex: 'remainingHours', key: 'remainingHours' },
-    { title: '已使用', dataIndex: 'useHours', key: 'useHours' },
+    {
+      title: '員工編號',
+      dataIndex: 'employeeNum',
+      key: 'employeeNum',
+      sorter: (a, b) => compareStrings(a.employeeNum, b.employeeNum),
+    },
+    {
+      title: '姓名',
+      dataIndex: 'employeeChname',
+      key: 'employeeChname',
+      sorter: (a, b) => compareStrings(a.employeeChname, b.employeeChname),
+    },
+    {
+      title: '假別',
+      dataIndex: 'leaveTypeName',
+      key: 'leaveTypeName',
+      sorter: (a, b) => compareStrings(a.leaveTypeName, b.leaveTypeName),
+    },
+    {
+      title: '起日',
+      dataIndex: 'startDate',
+      key: 'startDate',
+      render: formatDate,
+      sorter: (a, b) => compareDates(a.startDate, b.startDate),
+    },
+    {
+      title: '迄日',
+      dataIndex: 'endDate',
+      key: 'endDate',
+      render: formatDate,
+      sorter: (a, b) => compareDates(a.endDate, b.endDate),
+    },
+    {
+      title: '總額度',
+      dataIndex: 'availableHours',
+      key: 'availableHours',
+      sorter: (a, b) => compareNumbers(a.availableHours, b.availableHours),
+    },
+    {
+      title: '剩餘時數',
+      dataIndex: 'remainingHours',
+      key: 'remainingHours',
+      sorter: (a, b) => compareNumbers(a.remainingHours, b.remainingHours),
+    },
+    {
+      title: '已使用',
+      dataIndex: 'useHours',
+      key: 'useHours',
+      sorter: (a, b) => compareNumbers(a.useHours, b.useHours),
+    },
+    {
+      title: '備註',
+      dataIndex: 'descr',
+      key: 'descr',
+      ellipsis: true,
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.descr, b.descr),
+    },
     {
       title: '操作',
       key: 'action',
@@ -164,14 +215,17 @@ export default function EmployeeLeaveTypeList() {
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
           <Select
-            style={{ width: 240 }}
+            style={{ width: 360 }}
             placeholder="選擇客戶"
             value={companyId}
             onChange={(v) => {
               setCompanyId(v)
               setPage(0)
             }}
-            options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+            options={companies.map((c) => ({
+              value: c.id,
+              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+            }))}
           />
           <span>選擇派遣個案(篩選假別選項)：</span>
           <Select
@@ -250,8 +304,8 @@ export default function EmployeeLeaveTypeList() {
           <Form.Item name="useHours" label="已使用時數(小時)" rules={[{ required: true, message: '請輸入已使用時數' }]}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="descr" label="備註">
-            <Input.TextArea rows={2} />
+          <Form.Item name="descr" label="備註" extra="每天的年資轉年假排程會自動在這裡附加一行「哪一天新增多少時數」的紀錄">
+            <Input.TextArea rows={4} />
           </Form.Item>
         </Form>
         {editing && (

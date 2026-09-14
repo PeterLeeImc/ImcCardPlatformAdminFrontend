@@ -30,6 +30,7 @@ interface CompanyFormValues {
   addr: string
   punchMethod: string
   gpsRadiusMeters: number
+  descr: string
 }
 
 /**
@@ -103,6 +104,7 @@ export default function CompanyForm() {
           addr: d.addr ?? '',
           punchMethod: d.punchMethod ?? 'GPS',
           gpsRadiusMeters: d.gpsRadiusMeters ?? 200,
+          descr: d.descr ?? '',
         })
         if (d.latitude != null && d.longitude != null) {
           setSavedPosition([d.latitude, d.longitude])
@@ -194,6 +196,7 @@ export default function CompanyForm() {
         longitude: savedPosition?.[1],
         punchMethod: values.punchMethod,
         gpsRadiusMeters: values.gpsRadiusMeters,
+        descr: values.descr || undefined,
       }
       if (isEdit) {
         const body: CompanyUpdateRequest = base
@@ -332,6 +335,9 @@ export default function CompanyForm() {
                   </Space>
                 </div>
               )}
+            </Form.Item>
+            <Form.Item name="descr" label="備註">
+              <Input.TextArea placeholder="備註" rows={3} />
             </Form.Item>
             {isEdit && detail && (
               <div style={{ marginBottom: 16, fontSize: 12, color: '#999' }}>

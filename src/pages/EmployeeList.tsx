@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Checkbox, Input, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
+import { Button, Checkbox, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, EmployeeListItem, LogPage } from '../types'
-import { JOB_STATUS_OPTIONS, SEX_OPTIONS } from '../types'
+import { SEX_OPTIONS } from '../types'
 import { formatDate } from '../utils/formatDate'
 import { imcEmployeeDetailUrl } from '../utils/imcLinks'
+import { compareDates, compareNumbers, compareStrings } from '../utils/tableSort'
 
 const PAGE_SIZE = 20
 const SEX_LABELS: Record<string, string> = Object.fromEntries(SEX_OPTIONS.map((o) => [o.value, o.label]))
@@ -21,9 +22,6 @@ export default function EmployeeList() {
   const dispatchCaseId = searchParams.get('dispatchCaseId') ? Number(searchParams.get('dispatchCaseId')) : undefined
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
-  const [employeenum, setEmployeenum] = useState('')
-  const [chname, setChname] = useState('')
-  const [jobStatus, setJobStatus] = useState<string>()
   const [data, setData] = useState<LogPage<EmployeeListItem>>()
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -59,31 +57,36 @@ export default function EmployeeList() {
       .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
       .then((res) => {
         setDispatchCases(res.data)
-        if (dispatchCaseId && !res.data.some((d) => d.id === dispatchCaseId)) {
-          setSearchParams(
-            (prev) => {
-              const next = new URLSearchParams(prev)
-              next.delete('dispatchCaseId')
-              return next
-            },
-            { replace: true },
-          )
+        if (dispatchCaseId && res.data.some((d) => d.id === dispatchCaseId)) {
+          return
         }
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            if (res.data.length > 0) {
+              next.set('dispatchCaseId', String(res.data[0].id))
+            } else {
+              next.delete('dispatchCaseId')
+            }
+            return next
+          },
+          { replace: true },
+        )
       })
       .catch(() => setDispatchCases([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId])
 
   const fetchRows = (targetPage: number) => {
-    if (!companyId) return
+    if (!companyId || !dispatchCaseId) {
+      setData(undefined)
+      return
+    }
     setLoading(true)
     apiClient
       .get<LogPage<EmployeeListItem>>('/admin/employees', {
         params: {
           companyId,
-          employeenum: employeenum || undefined,
-          chname: chname || undefined,
-          jobStatus: jobStatus || undefined,
           dispatchCaseId,
           includeHidden,
           page: targetPage,
@@ -102,11 +105,6 @@ export default function EmployeeList() {
     fetchRows(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, dispatchCaseId, includeHidden, page])
-
-  const onSearch = () => {
-    setPage(0)
-    fetchRows(0)
-  }
 
   const changeCompany = (v: number | undefined) => {
     setSearchParams(
@@ -217,15 +215,76 @@ export default function EmployeeList() {
           )}
         </>
       ),
+      sorter: (a, b) => compareStrings(a.employeenum, b.employeenum),
     },
-    { title: '員工姓名', dataIndex: 'chname', key: 'chname' },
-    { title: '角色', dataIndex: 'roleLabel', key: 'roleLabel' },
-    { title: '在職狀態', dataIndex: 'jobStatusLabel', key: 'jobStatusLabel' },
-    { title: '性別', dataIndex: 'sex', key: 'sex', render: (v: string | null) => (v ? SEX_LABELS[v] ?? v : '-') },
-    { title: '行動電話', dataIndex: 'mobilePhone', key: 'mobilePhone', render: (v: string | null) => v ?? '-' },
-    { title: '到職日', dataIndex: 'takeDate', key: 'takeDate', render: formatDate },
-    { title: '離職日', dataIndex: 'leaveDate', key: 'leaveDate', render: formatDate },
-    { title: '簽核人員工編號', dataIndex: 'chargeHeadNum', key: 'chargeHeadNum', render: (v: string | null) => v ?? '-' },
+    {
+      title: '員工姓名',
+      dataIndex: 'chname',
+      key: 'chname',
+      sorter: (a, b) => compareStrings(a.chname, b.chname),
+    },
+    {
+      title: '角色',
+      dataIndex: 'roleLabel',
+      key: 'roleLabel',
+      sorter: (a, b) => compareStrings(a.roleLabel, b.roleLabel),
+    },
+    {
+      title: '在職狀態',
+      dataIndex: 'jobStatusLabel',
+      key: 'jobStatusLabel',
+      sorter: (a, b) => compareStrings(a.jobStatusLabel, b.jobStatusLabel),
+    },
+    {
+      title: '性別',
+      dataIndex: 'sex',
+      key: 'sex',
+      render: (v: string | null) => (v ? SEX_LABELS[v] ?? v : '-'),
+      sorter: (a, b) => compareStrings(a.sex, b.sex),
+    },
+    {
+      title: '行動電話',
+      dataIndex: 'mobilePhone',
+      key: 'mobilePhone',
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.mobilePhone, b.mobilePhone),
+    },
+    {
+      title: '到職日',
+      dataIndex: 'takeDate',
+      key: 'takeDate',
+      render: formatDate,
+      sorter: (a, b) => compareDates(a.takeDate, b.takeDate),
+    },
+    {
+      title: '離職日',
+      dataIndex: 'leaveDate',
+      key: 'leaveDate',
+      render: formatDate,
+      sorter: (a, b) => compareDates(a.leaveDate, b.leaveDate),
+    },
+    {
+      title: '簽核人員工編號',
+      dataIndex: 'chargeHeadNum',
+      key: 'chargeHeadNum',
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.chargeHeadNum, b.chargeHeadNum),
+    },
+    {
+      title: '到職天數',
+      dataIndex: 'takeDateDay',
+      key: 'takeDateDay',
+      render: (v: number | null) => v ?? '-',
+      sorter: (a, b) => compareNumbers(a.takeDateDay, b.takeDateDay),
+    },
+    {
+      title: '備註',
+      dataIndex: 'descr',
+      key: 'descr',
+      ellipsis: true,
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.descr, b.descr),
+    },
     {
       title: '操作',
       key: 'action',
@@ -279,39 +338,23 @@ export default function EmployeeList() {
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
           <Select
-            style={{ width: 240 }}
+            style={{ width: 360 }}
             placeholder="選擇客戶"
             value={companyId}
             onChange={changeCompany}
-            options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+            options={companies.map((c) => ({
+              value: c.id,
+              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+            }))}
           />
           <span>選擇個案：</span>
           <Select
             style={{ width: 200 }}
-            placeholder="個案(全部)"
-            allowClear
+            placeholder="選擇個案"
             value={dispatchCaseId}
             onChange={changeDispatchCase}
             options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
           />
-          <Input
-            style={{ width: 160 }}
-            placeholder="員工編號"
-            value={employeenum}
-            onChange={(e) => setEmployeenum(e.target.value)}
-          />
-          <Input style={{ width: 160 }} placeholder="姓名" value={chname} onChange={(e) => setChname(e.target.value)} />
-          <Select
-            style={{ width: 140 }}
-            placeholder="在職狀態(全部)"
-            allowClear
-            value={jobStatus}
-            onChange={setJobStatus}
-            options={JOB_STATUS_OPTIONS}
-          />
-          <Button type="primary" onClick={onSearch}>
-            查詢
-          </Button>
           {!isAdvisorRole() && (
             <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
               顯示已隱藏項目

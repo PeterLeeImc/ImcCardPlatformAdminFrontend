@@ -20,6 +20,7 @@ import { apiClient } from '../api/client'
 import type { HolidayItem, HolidayUpsertRequest, LogPage } from '../types'
 import { formatDate } from '../utils/formatDate'
 import { formatDateTime } from '../utils/formatDateTime'
+import { compareDates, compareStrings } from '../utils/tableSort'
 
 const PAGE_SIZE = 50
 const CURRENT_YEAR = String(new Date().getFullYear())
@@ -156,12 +157,39 @@ export default function HolidayList() {
   }
 
   const columns: ColumnsType<HolidayItem> = [
-    { title: '日期', dataIndex: 'day', key: 'day', render: formatDate },
-    { title: '假日說明', dataIndex: 'explain', key: 'explain' },
-    { title: '建立時間', dataIndex: 'createdAt', key: 'createdAt', render: formatDateTime },
-    { title: '建立者', dataIndex: 'createdBy', key: 'createdBy' },
-    { title: '異動時間', dataIndex: 'updatedAt', key: 'updatedAt', render: formatDateTime },
-    { title: '異動者', dataIndex: 'updatedBy', key: 'updatedBy' },
+    { title: '日期', dataIndex: 'day', key: 'day', render: formatDate, sorter: (a, b) => compareDates(a.day, b.day) },
+    {
+      title: '假日說明',
+      dataIndex: 'explain',
+      key: 'explain',
+      sorter: (a, b) => compareStrings(a.explain, b.explain),
+    },
+    {
+      title: '建立時間',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: formatDateTime,
+      sorter: (a, b) => compareDates(a.createdAt, b.createdAt),
+    },
+    {
+      title: '建立者',
+      dataIndex: 'createdBy',
+      key: 'createdBy',
+      sorter: (a, b) => compareStrings(a.createdBy, b.createdBy),
+    },
+    {
+      title: '異動時間',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      render: formatDateTime,
+      sorter: (a, b) => compareDates(a.updatedAt, b.updatedAt),
+    },
+    {
+      title: '異動者',
+      dataIndex: 'updatedBy',
+      key: 'updatedBy',
+      sorter: (a, b) => compareStrings(a.updatedBy, b.updatedBy),
+    },
     {
       title: '操作',
       key: 'action',

@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import { apiClient } from '../api/client'
 import type { LogPage, RwdLoginLogItem } from '../types'
+import { compareDates, compareStrings } from '../utils/tableSort'
 
 const PAGE_SIZE = 20
 
@@ -52,10 +53,28 @@ export default function LoginLogList() {
   }
 
   const columns: ColumnsType<RwdLoginLogItem> = [
-    { title: '帳號', dataIndex: 'employeenum', key: 'employeenum', width: 140 },
-    { title: '姓名', dataIndex: 'chname', key: 'chname', width: 140 },
-    { title: '登入時間', dataIndex: 'loginTime', key: 'loginTime', width: 180 },
-    { title: 'IP', dataIndex: 'ip', key: 'ip' },
+    {
+      title: '帳號',
+      dataIndex: 'employeenum',
+      key: 'employeenum',
+      width: 140,
+      sorter: (a, b) => compareStrings(a.employeenum, b.employeenum),
+    },
+    {
+      title: '姓名',
+      dataIndex: 'chname',
+      key: 'chname',
+      width: 140,
+      sorter: (a, b) => compareStrings(a.chname, b.chname),
+    },
+    {
+      title: '登入時間',
+      dataIndex: 'loginTime',
+      key: 'loginTime',
+      width: 180,
+      sorter: (a, b) => compareDates(a.loginTime, b.loginTime),
+    },
+    { title: 'IP', dataIndex: 'ip', key: 'ip', sorter: (a, b) => compareStrings(a.ip, b.ip) },
   ]
 
   return (

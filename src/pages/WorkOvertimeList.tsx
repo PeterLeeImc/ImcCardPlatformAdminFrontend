@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { Button, Checkbox, Form, Input, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
-import type { CompanyListItem, LogPage, WorkOvertimeItem, WorkOvertimeUpsertRequest } from '../types'
+import type { CompanyListItem, DispatchCaseItem, LogPage, WorkOvertimeItem, WorkOvertimeUpsertRequest } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
+import { compareStrings } from '../utils/tableSort'
 
 export default function WorkOvertimeList() {
   const navigate = useNavigate()
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [companyId, setCompanyId] = useState<number>()
+  const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
+  const [dispatchCaseId, setDispatchCaseId] = useState<number>()
   const [rows, setRows] = useState<WorkOvertimeItem[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<WorkOvertimeItem | 'new'>()
@@ -19,7 +22,7 @@ export default function WorkOvertimeList() {
   const [form] = Form.useForm<WorkOvertimeUpsertRequest>()
 
   const templateCompany = companies.find((c) => c.template)
-  const canCopyFromTemplate = !!templateCompany && !!companyId && templateCompany.id !== companyId
+  const canCopyFromTemplate = !!templateCompany && !!companyId && !!dispatchCaseId && templateCompany.id !== companyId
 
   useEffect(() => {
     apiClient
@@ -33,11 +36,25 @@ export default function WorkOvertimeList() {
       .catch(() => message.error('載入客戶清單失敗'))
   }, [])
 
-  const fetchRows = () => {
+  useEffect(() => {
     if (!companyId) return
+    apiClient
+      .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
+      .then((res) => {
+        setDispatchCases(res.data)
+        setDispatchCaseId(res.data.length > 0 ? res.data[0].id : undefined)
+      })
+      .catch(() => setDispatchCases([]))
+  }, [companyId])
+
+  const fetchRows = () => {
+    if (!dispatchCaseId) {
+      setRows([])
+      return
+    }
     setLoading(true)
     apiClient
-      .get<WorkOvertimeItem[]>('/admin/work-overtimes', { params: { companyId, includeHidden } })
+      .get<WorkOvertimeItem[]>('/admin/work-overtimes', { params: { dispatchCaseId, includeHidden } })
       .then((res) => setRows(res.data))
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
@@ -49,24 +66,24 @@ export default function WorkOvertimeList() {
   useEffect(() => {
     fetchRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, includeHidden])
+  }, [dispatchCaseId, includeHidden])
 
   const openEdit = (row: WorkOvertimeItem | 'new') => {
     setEditing(row)
     if (row === 'new') {
       form.resetFields()
     } else {
-      form.setFieldsValue({ chName: row.chName })
+      form.setFieldsValue({ chName: row.chName, descr: row.descr ?? undefined })
     }
   }
 
   const submitEdit = async () => {
-    if (!editing || !companyId) return
+    if (!editing || !dispatchCaseId) return
     try {
       const values = await form.validateFields()
       setSaving(true)
       if (editing === 'new') {
-        await apiClient.post('/admin/work-overtimes', values, { params: { companyId } })
+        await apiClient.post('/admin/work-overtimes', values, { params: { dispatchCaseId } })
         message.success('已新增加班別')
       } else {
         await apiClient.put(`/admin/work-overtimes/${editing.id}`, values)
@@ -84,15 +101,15 @@ export default function WorkOvertimeList() {
   }
 
   const copyFromTemplate = () => {
-    if (!templateCompany || !companyId) return
+    if (!templateCompany || !dispatchCaseId) return
     Modal.confirm({
-      title: '確定要從樣板公司複製加班別？',
-      content: `樣板公司：${templateCompany.chName}，同名的加班別不會重複複製，複製後可自行修改。`,
+      title: '確定要從樣板客戶複製加班別？',
+      content: `樣板客戶：${templateCompany.chName}，同名的加班別不會重複複製，複製後可自行修改。`,
       onOk: async () => {
         setCopying(true)
         try {
           const res = await apiClient.post<{ copied: number }>('/admin/work-overtimes/copy-from-template', null, {
-            params: { companyId },
+            params: { dispatchCaseId },
           })
           message.success(`已複製 ${res.data.copied} 筆加班別`)
           fetchRows()
@@ -158,6 +175,15 @@ export default function WorkOvertimeList() {
           )}
         </>
       ),
+      sorter: (a, b) => compareStrings(a.chName, b.chName),
+    },
+    {
+      title: '備註',
+      dataIndex: 'descr',
+      key: 'descr',
+      ellipsis: true,
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.descr, b.descr),
     },
     {
       title: '操作',
@@ -194,22 +220,33 @@ export default function WorkOvertimeList() {
           <a onClick={() => navigate('/')}>首頁</a>
           <span style={{ fontSize: 18, fontWeight: 600 }}>加班別維護</span>
         </Space>
-        <Button type="primary" onClick={() => openEdit('new')} disabled={!companyId}>
+        <Button type="primary" onClick={() => openEdit('new')} disabled={!dispatchCaseId}>
           新增加班別
         </Button>
       </div>
       <div style={{ padding: 24 }}>
-        <Space style={{ marginBottom: 16 }}>
+        <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
           <Select
-            style={{ width: 240 }}
+            style={{ width: 360 }}
             placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
-            options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+            options={companies.map((c) => ({
+              value: c.id,
+              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+            }))}
+          />
+          <span>選擇派遣個案：</span>
+          <Select
+            style={{ width: 200 }}
+            placeholder="選擇派遣個案"
+            value={dispatchCaseId}
+            onChange={setDispatchCaseId}
+            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
           />
           <Button onClick={copyFromTemplate} loading={copying} disabled={!canCopyFromTemplate}>
-            複製樣板公司加班別
+            複製樣板客戶加班別
           </Button>
           {!isAdvisorRole() && (
             <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
@@ -230,6 +267,9 @@ export default function WorkOvertimeList() {
         <Form form={form} layout="vertical">
           <Form.Item name="chName" label="加班別名稱" rules={[{ required: true, message: '請輸入加班別名稱' }]}>
             <Input placeholder="例如：平日加班、假日加班" />
+          </Form.Item>
+          <Form.Item name="descr" label="備註">
+            <Input.TextArea placeholder="備註" rows={3} />
           </Form.Item>
         </Form>
         {editing && editing !== 'new' && (

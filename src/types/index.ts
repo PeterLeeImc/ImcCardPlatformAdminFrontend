@@ -10,6 +10,7 @@ export interface ManagerListItem {
   roleLabel: string
   /** 建立業務帳號時查詢IMC系統所用的業務代號，建立後永久唯讀；手動建立的帳號是null。 */
   salesSerial: string | null
+  descr: string | null
 }
 
 export interface ManagerDetail extends ManagerListItem {
@@ -36,6 +37,7 @@ export interface ManagerCreateRequest {
   enabled: string
   role: string
   salesSerial?: string
+  descr?: string
 }
 
 export interface ManagerUpdateRequest {
@@ -43,6 +45,7 @@ export interface ManagerUpdateRequest {
   email: string
   enabled: string
   role: string
+  descr?: string
 }
 
 /** 新增業務帳號時，依業務代號查詢IMC系統的結果，見ManagerController.lookupSales()。 */
@@ -136,18 +139,26 @@ export interface LogPage<T> {
 
 // 通知 (notification broadcast)
 
-export interface NotificationItem {
+export interface AdminNotificationItem {
   id: number
-  senderAccount: string
-  senderName: string
-  recipientAccount: string | null
+  companyName: string
+  /** null代表舊制「全公司廣播」的歷史紀錄，沒有單一收件人可以對應到派遣個案。 */
+  dispatchCaseCode: string | null
+  /** null代表舊制全公司廣播歷史紀錄。 */
+  recipientEmployeeNum: string | null
+  recipientChname: string | null
   subject: string
   content: string
+  senderName: string
   sentTime: string
-  read: boolean
+  /** null代表未讀，或(舊制廣播)沒有單一明確的已讀時間可顯示。 */
+  readTime: string | null
 }
 
 export interface BroadcastNotificationRequest {
+  companyId?: number
+  dispatchCaseId?: number
+  employeeId?: number
   subject: string
   content: string
 }
@@ -159,10 +170,11 @@ export interface CompanyListItem {
   companyNum: string
   chName: string
   name4Short: string
-  /** 樣板公司：全系統同一時間只會有一家，見CompanyController.setTemplate()。 */
+  /** 樣板客戶：全系統同一時間只會有一家，見CompanyController.setTemplate()。 */
   template: boolean
   /** 顧問角色刪除只是隱藏(軟刪除)，系統管理者/系統使用者可以還原或真的刪除。 */
   hidden: boolean
+  descr: string | null
 }
 
 export interface CompanyDetail {
@@ -177,6 +189,7 @@ export interface CompanyDetail {
   gpsRadiusMeters: number | null
   template: boolean
   hidden: boolean
+  descr: string | null
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null
@@ -192,6 +205,7 @@ export interface CompanyCreateRequest {
   longitude?: number
   punchMethod?: string
   gpsRadiusMeters?: number
+  descr?: string
 }
 
 export type CompanyUpdateRequest = Omit<CompanyCreateRequest, 'companyNum'>
@@ -216,6 +230,7 @@ export interface WebLeaveTypeItem {
   jobWorkDay: number | null
   annualEffectiveDate: string | null
   accumulatingLeaveType: string | null
+  descr: string | null
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null
@@ -231,6 +246,7 @@ export interface WebLeaveTypeUpdateRequest {
   jobWorkDay: number | null
   annualEffectiveDate: string | null
   accumulatingLeaveType: string | null
+  descr: string | null
 }
 
 export interface WebEmpLeaveTypeItem {
@@ -271,8 +287,7 @@ export const SET_MODE_OPTIONS = [
 
 export const ANNUAL_EFFECTIVE_DATE_OPTIONS = [
   { value: '001', label: '無' },
-  { value: '002', label: '每年到職日' },
-  { value: '003', label: '每年第一天' },
+  { value: '002', label: '到職日' },
 ]
 
 // 派遣個案 / 員工維護
@@ -282,8 +297,11 @@ export interface DispatchCaseItem {
   caseCode: string
   responsibleUserId: number | null
   responsibleUserName: string | null
+  /** 班段採首筆班表或每月自訂：true=每月自訂、false=首筆班表(固定套用這個派遣個案第一筆班表)。 */
+  useCustomSchedule: boolean
   defaultOvertimeChangeToCompTime: boolean
   hidden: boolean
+  descr: string | null
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null
@@ -293,7 +311,9 @@ export interface DispatchCaseItem {
 export interface DispatchCaseUpsertRequest {
   caseCode: string
   responsibleUserId?: number | null
+  useCustomSchedule: boolean
   defaultOvertimeChangeToCompTime: boolean
+  descr?: string
 }
 
 export interface ManagerOption {
@@ -312,6 +332,7 @@ export interface LeaveTypeMasterItem {
   leaveSexCondition: string | null
   attachFileHours: number | null
   hidden: boolean
+  descr: string | null
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null
@@ -324,6 +345,7 @@ export interface LeaveTypeMasterUpsertRequest {
   leaveDefaultFiled?: string
   leaveSexCondition?: string
   attachFileHours?: number
+  descr?: string
 }
 
 export const LEAVE_DEFAULT_FILED_OPTIONS = [
@@ -331,6 +353,7 @@ export const LEAVE_DEFAULT_FILED_OPTIONS = [
   { value: '002', label: '年假' },
   { value: '003', label: '補休' },
   { value: '006', label: '生理假' },
+  { value: '010', label: '公假' },
 ]
 
 export const LEAVE_SEX_CONDITION_OPTIONS = [
@@ -345,6 +368,7 @@ export interface WorkOvertimeItem {
   id: number
   chName: string
   hidden: boolean
+  descr: string | null
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null
@@ -353,6 +377,7 @@ export interface WorkOvertimeItem {
 
 export interface WorkOvertimeUpsertRequest {
   chName: string
+  descr?: string
 }
 
 // 班表內容 (company time schedule master)
@@ -370,6 +395,7 @@ export interface ComTimeScheduleItem {
   longitude: number | null
   punchMethod: string | null
   gpsRadiusMeters: number | null
+  descr: string | null
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null
@@ -388,6 +414,7 @@ export interface ComTimeScheduleUpsertRequest {
   longitude?: number
   punchMethod?: string
   gpsRadiusMeters?: number
+  descr?: string
 }
 
 export interface EmployeeListItem {
@@ -401,10 +428,12 @@ export interface EmployeeListItem {
   sex: string | null
   mobilePhone: string | null
   takeDate: string | null
+  takeDateDay: number | null
   leaveDate: string | null
   chargeHeadNum: string | null
   dispatchCaseCode: string | null
   hidden: boolean
+  descr: string | null
 }
 
 export interface EmployeeDetail {
@@ -424,6 +453,7 @@ export interface EmployeeDetail {
   chargeHeadNum: string | null
   realChargeHeadNum: string | null
   hidden: boolean
+  descr: string | null
   createdAt: string | null
   createdBy: string | null
   updatedAt: string | null
@@ -442,6 +472,7 @@ export interface EmployeeUpsertRequest {
   leaveDate?: string
   jobStatus?: string
   chargeHeadNum?: string
+  descr?: string
 }
 
 // 員工的角色只有一般員工/簽核員工兩種(系統管理者/系統使用者是Manager帳號的角色，跟員工分開)。
@@ -483,6 +514,7 @@ export interface HolidayUpsertRequest {
 export interface EmpDayCardRow {
   employeeId: number
   employeeNum: string
+  dispatchCaseCode: string | null
   employeeChname: string
   rowDate: string
   cardId: number | null
@@ -507,6 +539,7 @@ export interface EmpDayCardRow {
 
 export interface AttendanceReportRow {
   employeeNum: string
+  dispatchCaseCode: string | null
   chName: string
   date: string
   workType: string
@@ -520,4 +553,24 @@ export interface AttendanceReportRow {
   overtimeStart: string
   overtimeEnd: string
   overtimeHours: string
+}
+
+// 排程管理
+
+export interface ScheduledJobItem {
+  jobKey: string
+  displayName: string
+  description: string
+  /** Spring cron格式(秒 分 時 日 月 星期)；管理端畫面用時間選擇器編輯，實際上都是「每天固定某個時間點」的排程，換算成"0 {分} {時} * * *"。 */
+  cronExpression: string
+  enabled: boolean
+  lastRunAt: string | null
+  lastRunSuccess: boolean | null
+  lastRunMessage: string | null
+  lastRunBy: string | null
+}
+
+export interface ScheduledJobUpdateRequest {
+  cronExpression: string
+  enabled: boolean
 }

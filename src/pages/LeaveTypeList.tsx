@@ -7,16 +7,20 @@ import {
   LEAVE_DEFAULT_FILED_OPTIONS,
   LEAVE_SEX_CONDITION_OPTIONS,
   type CompanyListItem,
+  type DispatchCaseItem,
   type LeaveTypeMasterItem,
   type LeaveTypeMasterUpsertRequest,
   type LogPage,
 } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
+import { compareNumbers, compareStrings } from '../utils/tableSort'
 
 export default function LeaveTypeList() {
   const navigate = useNavigate()
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [companyId, setCompanyId] = useState<number>()
+  const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
+  const [dispatchCaseId, setDispatchCaseId] = useState<number>()
   const [rows, setRows] = useState<LeaveTypeMasterItem[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<LeaveTypeMasterItem | 'new'>()
@@ -26,7 +30,7 @@ export default function LeaveTypeList() {
   const [form] = Form.useForm<LeaveTypeMasterUpsertRequest>()
 
   const templateCompany = companies.find((c) => c.template)
-  const canCopyFromTemplate = !!templateCompany && !!companyId && templateCompany.id !== companyId
+  const canCopyFromTemplate = !!templateCompany && !!companyId && !!dispatchCaseId && templateCompany.id !== companyId
 
   useEffect(() => {
     apiClient
@@ -40,11 +44,25 @@ export default function LeaveTypeList() {
       .catch(() => message.error('載入客戶清單失敗'))
   }, [])
 
-  const fetchRows = () => {
+  useEffect(() => {
     if (!companyId) return
+    apiClient
+      .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
+      .then((res) => {
+        setDispatchCases(res.data)
+        setDispatchCaseId(res.data.length > 0 ? res.data[0].id : undefined)
+      })
+      .catch(() => setDispatchCases([]))
+  }, [companyId])
+
+  const fetchRows = () => {
+    if (!dispatchCaseId) {
+      setRows([])
+      return
+    }
     setLoading(true)
     apiClient
-      .get<LeaveTypeMasterItem[]>('/admin/leave-types', { params: { companyId, includeHidden } })
+      .get<LeaveTypeMasterItem[]>('/admin/leave-types', { params: { dispatchCaseId, includeHidden } })
       .then((res) => setRows(res.data))
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
@@ -56,7 +74,7 @@ export default function LeaveTypeList() {
   useEffect(() => {
     fetchRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, includeHidden])
+  }, [dispatchCaseId, includeHidden])
 
   const openEdit = (row: LeaveTypeMasterItem | 'new') => {
     setEditing(row)
@@ -68,17 +86,18 @@ export default function LeaveTypeList() {
         leaveDefaultFiled: row.leaveDefaultFiled ?? undefined,
         leaveSexCondition: row.leaveSexCondition ?? undefined,
         attachFileHours: row.attachFileHours ?? undefined,
+        descr: row.descr ?? undefined,
       })
     }
   }
 
   const submitEdit = async () => {
-    if (!editing || !companyId) return
+    if (!editing || !dispatchCaseId) return
     try {
       const values = await form.validateFields()
       setSaving(true)
       if (editing === 'new') {
-        await apiClient.post('/admin/leave-types', values, { params: { companyId } })
+        await apiClient.post('/admin/leave-types', values, { params: { dispatchCaseId } })
         message.success('已新增假別')
       } else {
         await apiClient.put(`/admin/leave-types/${editing.id}`, values)
@@ -96,15 +115,15 @@ export default function LeaveTypeList() {
   }
 
   const copyFromTemplate = () => {
-    if (!templateCompany || !companyId) return
+    if (!templateCompany || !dispatchCaseId) return
     Modal.confirm({
-      title: '確定要從樣板公司複製假別？',
-      content: `樣板公司：${templateCompany.chName}，同名的假別不會重複複製，複製後可自行修改。`,
+      title: '確定要從樣板客戶複製假別？',
+      content: `樣板客戶：${templateCompany.chName}，同名的假別不會重複複製，複製後可自行修改。`,
       onOk: async () => {
         setCopying(true)
         try {
           const res = await apiClient.post<{ copied: number }>('/admin/leave-types/copy-from-template', null, {
-            params: { companyId },
+            params: { dispatchCaseId },
           })
           message.success(`已複製 ${res.data.copied} 筆假別`)
           fetchRows()
@@ -171,20 +190,38 @@ export default function LeaveTypeList() {
           )}
         </>
       ),
+      sorter: (a, b) => compareStrings(a.chname, b.chname),
     },
     {
       title: '角色代碼',
       dataIndex: 'leaveDefaultFiled',
       key: 'leaveDefaultFiled',
       render: (v) => labelOf(LEAVE_DEFAULT_FILED_OPTIONS, v),
+      sorter: (a, b) =>
+        compareStrings(labelOf(LEAVE_DEFAULT_FILED_OPTIONS, a.leaveDefaultFiled), labelOf(LEAVE_DEFAULT_FILED_OPTIONS, b.leaveDefaultFiled)),
     },
     {
       title: '性別條件',
       dataIndex: 'leaveSexCondition',
       key: 'leaveSexCondition',
       render: (v) => labelOf(LEAVE_SEX_CONDITION_OPTIONS, v),
+      sorter: (a, b) =>
+        compareStrings(labelOf(LEAVE_SEX_CONDITION_OPTIONS, a.leaveSexCondition), labelOf(LEAVE_SEX_CONDITION_OPTIONS, b.leaveSexCondition)),
     },
-    { title: '需附件最小時數', dataIndex: 'attachFileHours', key: 'attachFileHours' },
+    {
+      title: '需附件最小時數',
+      dataIndex: 'attachFileHours',
+      key: 'attachFileHours',
+      sorter: (a, b) => compareNumbers(a.attachFileHours, b.attachFileHours),
+    },
+    {
+      title: '備註',
+      dataIndex: 'descr',
+      key: 'descr',
+      ellipsis: true,
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.descr, b.descr),
+    },
     {
       title: '操作',
       key: 'action',
@@ -220,22 +257,33 @@ export default function LeaveTypeList() {
           <a onClick={() => navigate('/')}>首頁</a>
           <span style={{ fontSize: 18, fontWeight: 600 }}>假別維護</span>
         </Space>
-        <Button type="primary" onClick={() => openEdit('new')} disabled={!companyId}>
+        <Button type="primary" onClick={() => openEdit('new')} disabled={!dispatchCaseId}>
           新增假別
         </Button>
       </div>
       <div style={{ padding: 24 }}>
-        <Space style={{ marginBottom: 16 }}>
+        <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
           <Select
-            style={{ width: 240 }}
+            style={{ width: 360 }}
             placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
-            options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+            options={companies.map((c) => ({
+              value: c.id,
+              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+            }))}
+          />
+          <span>選擇派遣個案：</span>
+          <Select
+            style={{ width: 200 }}
+            placeholder="選擇派遣個案"
+            value={dispatchCaseId}
+            onChange={setDispatchCaseId}
+            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
           />
           <Button onClick={copyFromTemplate} loading={copying} disabled={!canCopyFromTemplate}>
-            複製樣板公司假別
+            複製樣板客戶假別
           </Button>
           {!isAdvisorRole() && (
             <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
@@ -265,6 +313,9 @@ export default function LeaveTypeList() {
           </Form.Item>
           <Form.Item name="attachFileHours" label="需附件最小時數" extra="請假時數達到這個門檻才需要上傳附件，留空代表不需要附件">
             <InputNumber style={{ width: '100%' }} min={0} />
+          </Form.Item>
+          <Form.Item name="descr" label="備註">
+            <Input.TextArea placeholder="備註" rows={3} />
           </Form.Item>
         </Form>
         {editing && editing !== 'new' && (

@@ -25,7 +25,7 @@ import WorkOvertimeList from './pages/WorkOvertimeList'
 import HolidayList from './pages/HolidayList'
 import ComTimeScheduleList from './pages/ComTimeScheduleList'
 import EmpScheduleCalendar from './pages/EmpScheduleCalendar'
-import BatchImport from './pages/BatchImport'
+import ScheduledJobList from './pages/ScheduledJobList'
 import { useIdleLogout } from './hooks/useIdleLogout'
 
 // 要跟後端 app.jwt.expiration-ms 保持一致
@@ -105,6 +105,14 @@ export default function App() {
           element={
             <RequireAuth>
               <RoleRightsMatrix />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/scheduled-jobs"
+          element={
+            <RequireAuth>
+              <ScheduledJobList />
             </RequireAuth>
           }
         />
@@ -257,14 +265,6 @@ export default function App() {
           element={
             <RequireAuth>
               <EmpScheduleCalendar />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/batch-import"
-          element={
-            <RequireAuth>
-              <BatchImport />
             </RequireAuth>
           }
         />

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, DatePicker, Layout, Modal, Select, Space, Upload, message } from 'antd'
+import { Button, DatePicker, Input, Layout, Modal, Select, Space, Upload, message } from 'antd'
 import { LeftOutlined, RightOutlined, UploadOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { apiClient } from '../api/client'
-import type { CompanyListItem, DispatchCaseItem, LogPage } from '../types'
+import type { CompanyListItem, DispatchCaseItem, LeaveTypeMasterItem, LogPage } from '../types'
+
+const LEAVE_DEFAULT_FILED_OFFICIAL = '010' // 公假
 
 interface AdminEmployeeOption {
   id: number
@@ -88,6 +90,15 @@ export default function EmpScheduleCalendar() {
   const [importing, setImporting] = useState(false)
   const [importErrors, setImportErrors] = useState<string[]>([])
 
+  // 快速產生公假
+  const [officialLeaveTypes, setOfficialLeaveTypes] = useState<LeaveTypeMasterItem[]>([])
+  const [officialLeaveOpen, setOfficialLeaveOpen] = useState(false)
+  const [officialLeaveEmployeeIds, setOfficialLeaveEmployeeIds] = useState<number[]>([])
+  const [officialLeaveTypeId, setOfficialLeaveTypeId] = useState<number>()
+  const [officialLeaveDates, setOfficialLeaveDates] = useState<Dayjs[]>([dayjs()])
+  const [officialLeaveDescr, setOfficialLeaveDescr] = useState('')
+  const [officialLeaveSaving, setOfficialLeaveSaving] = useState(false)
+
   useEffect(() => {
     apiClient
       .get<LogPage<CompanyListItem>>('/admin/companies', { params: { page: 0, size: 200 } })
@@ -123,6 +134,10 @@ export default function EmpScheduleCalendar() {
       .get<ShiftOption[]>(`/admin/companies/${companyId}/dispatch-cases/${dispatchCaseId}/time-schedules`)
       .then((res) => setShiftOptions(res.data))
       .catch(() => setShiftOptions([]))
+    apiClient
+      .get<LeaveTypeMasterItem[]>('/admin/leave-types', { params: { dispatchCaseId } })
+      .then((res) => setOfficialLeaveTypes(res.data.filter((lt) => lt.leaveDefaultFiled === LEAVE_DEFAULT_FILED_OFFICIAL)))
+      .catch(() => setOfficialLeaveTypes([]))
     setSelectedEmployeeId(ALL_EMPLOYEES)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, dispatchCaseId])
@@ -358,6 +373,40 @@ export default function EmpScheduleCalendar() {
     }
   }
 
+  // 快速產生公假
+  const openOfficialLeave = () => {
+    setOfficialLeaveEmployeeIds([])
+    setOfficialLeaveTypeId(officialLeaveTypes[0]?.id)
+    setOfficialLeaveDates([dayjs()])
+    setOfficialLeaveDescr('')
+    setOfficialLeaveOpen(true)
+  }
+
+  const submitOfficialLeave = async () => {
+    if (!officialLeaveTypeId || officialLeaveEmployeeIds.length === 0 || officialLeaveDates.length === 0) {
+      message.error('請選擇員工、公假假別，並至少選擇一天')
+      return
+    }
+    if (!companyId || !dispatchCaseId) return
+    setOfficialLeaveSaving(true)
+    try {
+      const res = await apiClient.post<{ created: number }>(`${basePath()}/quick-official-leave`, {
+        leaveTypeId: officialLeaveTypeId,
+        employeeIds: officialLeaveEmployeeIds,
+        dates: officialLeaveDates.map((d) => d.format('YYYY-MM-DD')),
+        descr: officialLeaveDescr || undefined,
+      })
+      message.success(`已產生${res.data.created}筆公假紀錄，並自動核准`)
+      setOfficialLeaveOpen(false)
+      load()
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: string } }
+      message.error(axiosErr.response?.data ?? '產生公假失敗')
+    } finally {
+      setOfficialLeaveSaving(false)
+    }
+  }
+
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
       <div
@@ -374,19 +423,27 @@ export default function EmpScheduleCalendar() {
           <a onClick={() => navigate('/')}>首頁</a>
           <span style={{ fontSize: 18, fontWeight: 600 }}>員工班段行事曆</span>
         </Space>
-        <Button onClick={openQuickAssign} disabled={!dispatchCaseId}>
-          快速排班
-        </Button>
+        <Space>
+          <Button onClick={openQuickAssign} disabled={!dispatchCaseId}>
+            快速排班
+          </Button>
+          <Button onClick={openOfficialLeave} disabled={!dispatchCaseId || officialLeaveTypes.length === 0}>
+            快速產生公假
+          </Button>
+        </Space>
       </div>
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
           <Select
-            style={{ width: 240 }}
+            style={{ width: 360 }}
             placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
-            options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+            options={companies.map((c) => ({
+              value: c.id,
+              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+            }))}
           />
           <span>選擇派遣個案：</span>
           <Select
@@ -644,6 +701,64 @@ export default function EmpScheduleCalendar() {
           })}
         </div>
         <div style={{ fontSize: 12, color: '#999' }}>已選 {quickDates.size} 天</div>
+      </Modal>
+
+      <Modal
+        title="快速產生公假"
+        open={officialLeaveOpen}
+        onCancel={() => setOfficialLeaveOpen(false)}
+        onOk={submitOfficialLeave}
+        confirmLoading={officialLeaveSaving}
+        destroyOnHidden
+        width={480}
+      >
+        <div style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>
+          產生後直接標記為系統核准(簽核者：系統)，會發通知給員工，不會再走主管簽核流程。
+        </div>
+        <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>選擇員工(可全部或某幾位)</div>
+        <Select
+          style={{ width: '100%', marginBottom: 12 }}
+          mode="multiple"
+          value={officialLeaveEmployeeIds}
+          onChange={setOfficialLeaveEmployeeIds}
+          options={employees.map((e) => ({ value: e.id, label: `${e.employeenum} ${e.chname}` }))}
+          showSearch
+          optionFilterProp="label"
+          maxTagCount="responsive"
+        />
+        <Button
+          size="small"
+          style={{ marginBottom: 12 }}
+          onClick={() =>
+            setOfficialLeaveEmployeeIds(
+              officialLeaveEmployeeIds.length === employees.length ? [] : employees.map((e) => e.id),
+            )
+          }
+        >
+          {officialLeaveEmployeeIds.length === employees.length ? '取消全選' : '全選'}
+        </Button>
+        <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>假別(角色代碼為公假)</div>
+        <Select
+          style={{ width: '100%', marginBottom: 12 }}
+          value={officialLeaveTypeId}
+          onChange={setOfficialLeaveTypeId}
+          options={officialLeaveTypes.map((lt) => ({ value: lt.id, label: lt.chname }))}
+        />
+        <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>公假日期(可複選，預設今天)</div>
+        <DatePicker
+          multiple
+          style={{ width: '100%', marginBottom: 12 }}
+          format="YYYY/MM/DD"
+          value={officialLeaveDates}
+          onChange={(dates) => setOfficialLeaveDates((dates as Dayjs[] | null) ?? [])}
+        />
+        <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>事由(選填)</div>
+        <Input.TextArea
+          rows={2}
+          value={officialLeaveDescr}
+          onChange={(e) => setOfficialLeaveDescr(e.target.value)}
+          placeholder="例如：出差、公務、教育訓練"
+        />
       </Modal>
     </Layout>
   )

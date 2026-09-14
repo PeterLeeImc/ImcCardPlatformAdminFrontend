@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
 import type { ManagerListItem, ManagerPage } from '../types'
 import { ENABLED_OPTIONS } from '../types'
+import { compareStrings } from '../utils/tableSort'
 
 const PAGE_SIZE = 20
 
@@ -78,15 +79,26 @@ export default function ManagerList() {
   }
 
   const columns: ColumnsType<ManagerListItem> = [
-    { title: '帳號', dataIndex: 'account', key: 'account' },
-    { title: '使用者名稱', dataIndex: 'username', key: 'username' },
-    { title: 'Email', dataIndex: 'email', key: 'email' },
-    { title: '角色', dataIndex: 'roleLabel', key: 'roleLabel' },
+    { title: '帳號', dataIndex: 'account', key: 'account', sorter: (a, b) => compareStrings(a.account, b.account) },
+    {
+      title: '使用者名稱',
+      dataIndex: 'username',
+      key: 'username',
+      sorter: (a, b) => compareStrings(a.username, b.username),
+    },
+    { title: 'Email', dataIndex: 'email', key: 'email', sorter: (a, b) => compareStrings(a.email, b.email) },
+    {
+      title: '角色',
+      dataIndex: 'roleLabel',
+      key: 'roleLabel',
+      sorter: (a, b) => compareStrings(a.roleLabel, b.roleLabel),
+    },
     {
       title: '業務代號',
       dataIndex: 'salesSerial',
       key: 'salesSerial',
       render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.salesSerial, b.salesSerial),
     },
     {
       title: '狀態',
@@ -95,6 +107,15 @@ export default function ManagerList() {
       render: (enabled: string) => (
         <Tag color={enabled === '1' ? 'green' : 'default'}>{enabledLabel(enabled)}</Tag>
       ),
+      sorter: (a, b) => compareStrings(enabledLabel(a.enabled), enabledLabel(b.enabled)),
+    },
+    {
+      title: '備註',
+      dataIndex: 'descr',
+      key: 'descr',
+      ellipsis: true,
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.descr, b.descr),
     },
     {
       title: '操作',

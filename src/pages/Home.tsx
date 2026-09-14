@@ -19,10 +19,10 @@ import {
   TagsOutlined,
   FieldTimeOutlined,
   AppstoreOutlined,
-  ImportOutlined,
   ScheduleOutlined,
   DatabaseOutlined,
   TableOutlined,
+  SyncOutlined,
 } from '@ant-design/icons'
 
 const RESET_CONFIRM_TEXT = 'RESET'
@@ -61,7 +61,7 @@ export default function Home() {
       )
       message.success(
         res.data.templatePreserved
-          ? `資料庫已還原成初始狀態(保留樣板公司「${res.data.templateCompanyName}」)，即將登出，請重新登入`
+          ? `資料庫已還原成初始狀態(保留樣板客戶「${res.data.templateCompanyName}」)，即將登出，請重新登入`
           : '資料庫已還原成初始狀態，即將登出，請重新登入',
       )
       setResetModalOpen(false)
@@ -194,11 +194,11 @@ export default function Home() {
           icon: <ScheduleOutlined style={{ fontSize: 32 }} />,
         },
         {
-          key: '/batch-import',
-          rightName: '維護作業|多客戶班表匯入',
-          label: '多客戶班表匯入',
-          desc: '一次匯出/匯入全部客戶的客戶資料、班表、假別、加班別',
-          icon: <ImportOutlined style={{ fontSize: 32 }} />,
+          key: '/scheduled-jobs',
+          rightName: '後台系統作業|排程管理',
+          label: '排程管理',
+          desc: '查看目前系統排程與說明，可設定執行時間、手動執行',
+          icon: <SyncOutlined style={{ fontSize: 32 }} />,
         },
         {
           key: '/operation-logs',
@@ -316,7 +316,7 @@ export default function Home() {
           這個操作會<b>清空所有客戶、員工、派遣個案、假別、配假、加班別、排班、打卡、請假、加班、通知、
           操作紀錄、登入紀錄</b>等資料，只保留 imcPeter 這一個使用者帳號，角色權限設定不受影響。
         </p>
-        <p>如果有設定樣板公司，這家公司連同底下的個案/員工/假別/加班別/排班等資料會一併保留，不會被清空。</p>
+        <p>如果有設定樣板客戶，這家公司連同底下的個案/員工/假別/加班別/排班等資料會一併保留，不會被清空。</p>
         <p style={{ color: '#ff4d4f' }}>此操作無法復原，執行後會立即登出，請確認是本機測試環境再繼續。</p>
         <p>
           請輸入 <b>{RESET_CONFIRM_TEXT}</b> 以確認：

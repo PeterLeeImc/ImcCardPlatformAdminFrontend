@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, LogPage } from '../types'
 import { imcCustomerDetailUrl } from '../utils/imcLinks'
+import { compareStrings } from '../utils/tableSort'
 
 const PAGE_SIZE = 20
 
@@ -36,20 +37,20 @@ export default function CompanyList() {
 
   const handleSetTemplate = (record: CompanyListItem) => {
     Modal.confirm({
-      title: '確定要把這家客戶設為樣板公司？',
+      title: '確定要把這家客戶設為樣板客戶？',
       content: (
         <>
           客戶：{record.chName}
           <br />
-          全系統同一時間只會有一家樣板公司，設定後原本的樣板公司會自動取消。
+          全系統同一時間只會有一家樣板客戶，設定後原本的樣板客戶會自動取消。
           <br />
-          其他客戶可以在「假別維護」「加班別維護」畫面選擇從樣板公司複製設定當起始值。
+          其他客戶可以在「假別維護」「加班別維護」畫面選擇從樣板客戶複製設定當起始值。
         </>
       ),
       onOk: async () => {
         try {
           await apiClient.post(`/admin/companies/${record.id}/set-template`)
-          message.success('已設為樣板公司')
+          message.success('已設為樣板客戶')
           fetchCompanies(page, includeHidden)
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
@@ -61,12 +62,12 @@ export default function CompanyList() {
 
   const handleUnsetTemplate = (record: CompanyListItem) => {
     Modal.confirm({
-      title: '確定要取消這家客戶的樣板公司標記？',
+      title: '確定要取消這家客戶的樣板客戶標記？',
       content: `客戶：${record.chName}`,
       onOk: async () => {
         try {
           await apiClient.post(`/admin/companies/${record.id}/unset-template`)
-          message.success('已取消樣板公司標記')
+          message.success('已取消樣板客戶標記')
           fetchCompanies(page, includeHidden)
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
@@ -123,6 +124,7 @@ export default function CompanyList() {
           {v}
         </a>
       ),
+      sorter: (a, b) => compareStrings(a.companyNum, b.companyNum),
     },
     {
       title: '客戶名稱',
@@ -133,7 +135,7 @@ export default function CompanyList() {
           {v}
           {record.template && (
             <Tag color="gold" style={{ marginLeft: 8 }}>
-              樣板公司
+              樣板客戶
             </Tag>
           )}
           {record.hidden && (
@@ -143,8 +145,22 @@ export default function CompanyList() {
           )}
         </>
       ),
+      sorter: (a, b) => compareStrings(a.chName, b.chName),
     },
-    { title: '簡稱', dataIndex: 'name4Short', key: 'name4Short' },
+    {
+      title: '簡稱',
+      dataIndex: 'name4Short',
+      key: 'name4Short',
+      sorter: (a, b) => compareStrings(a.name4Short, b.name4Short),
+    },
+    {
+      title: '備註',
+      dataIndex: 'descr',
+      key: 'descr',
+      ellipsis: true,
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.descr, b.descr),
+    },
     {
       title: '操作',
       key: 'action',

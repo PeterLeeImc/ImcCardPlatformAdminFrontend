@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import { apiClient } from '../api/client'
 import type { LogPage, RwdOperationLogItem } from '../types'
+import { compareDates, compareStrings } from '../utils/tableSort'
 
 const PAGE_SIZE = 20
 
@@ -54,11 +55,35 @@ export default function OperationLogList() {
   }
 
   const columns: ColumnsType<RwdOperationLogItem> = [
-    { title: '帳號', dataIndex: 'employeenum', key: 'employeenum', width: 120 },
-    { title: '姓名', dataIndex: 'chname', key: 'chname', width: 120 },
-    { title: '功能', dataIndex: 'function', key: 'function', width: 140 },
-    { title: '動作', dataIndex: 'action', key: 'action' },
-    { title: '時間', dataIndex: 'operationTime', key: 'operationTime', width: 180 },
+    {
+      title: '帳號',
+      dataIndex: 'employeenum',
+      key: 'employeenum',
+      width: 120,
+      sorter: (a, b) => compareStrings(a.employeenum, b.employeenum),
+    },
+    {
+      title: '姓名',
+      dataIndex: 'chname',
+      key: 'chname',
+      width: 120,
+      sorter: (a, b) => compareStrings(a.chname, b.chname),
+    },
+    {
+      title: '功能',
+      dataIndex: 'function',
+      key: 'function',
+      width: 140,
+      sorter: (a, b) => compareStrings(a.function, b.function),
+    },
+    { title: '動作', dataIndex: 'action', key: 'action', sorter: (a, b) => compareStrings(a.action, b.action) },
+    {
+      title: '時間',
+      dataIndex: 'operationTime',
+      key: 'operationTime',
+      width: 180,
+      sorter: (a, b) => compareDates(a.operationTime, b.operationTime),
+    },
   ]
 
   return (

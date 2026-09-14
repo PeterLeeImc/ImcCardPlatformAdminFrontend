@@ -29,6 +29,7 @@ interface EmployeeFormValues {
   leaveDate: dayjs.Dayjs | null
   jobStatus: string
   chargeHeadNum: string
+  descr: string
 }
 
 export default function EmployeeForm() {
@@ -100,6 +101,7 @@ export default function EmployeeForm() {
           leaveDate: d.leaveDate ? dayjs(d.leaveDate) : null,
           jobStatus: d.jobStatus ?? undefined,
           chargeHeadNum: d.chargeHeadNum ?? '',
+          descr: d.descr ?? '',
         })
       })
       .catch((err) => {
@@ -155,6 +157,7 @@ export default function EmployeeForm() {
         leaveDate: values.leaveDate ? values.leaveDate.format(WIRE_DATE_FORMAT) : undefined,
         jobStatus: values.jobStatus,
         chargeHeadNum: values.chargeHeadNum || undefined,
+        descr: values.descr || undefined,
       }
       if (isEdit) {
         const res = await apiClient.put<EmployeeDetail>(`/admin/employees/${id}`, body)
@@ -240,7 +243,10 @@ export default function EmployeeForm() {
                 <Form.Item name="companyId" label="客戶" rules={[{ required: true, message: '請選擇客戶' }]}>
                   <Select
                     placeholder="選擇客戶"
-                    options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+                    options={companies.map((c) => ({
+                      value: c.id,
+                      label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+                    }))}
                     onChange={(v) => {
                       setNewCompanyId(v)
                       form.setFieldValue('dispatchCaseId', undefined)
@@ -285,6 +291,9 @@ export default function EmployeeForm() {
               tooltip="輸入另一位員工的員工編號，儲存後系統會自動查找、算出真正的簽核主管"
             >
               <Input placeholder="員工編號" />
+            </Form.Item>
+            <Form.Item name="descr" label="備註">
+              <Input.TextArea placeholder="備註" rows={3} />
             </Form.Item>
             {isEdit && detail?.realChargeHeadNum && (
               <div style={{ marginTop: -16, marginBottom: 16, fontSize: 12, color: '#999' }}>

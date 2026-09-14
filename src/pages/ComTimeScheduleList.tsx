@@ -10,6 +10,7 @@ import type { CompanyListItem, ComTimeScheduleItem, ComTimeScheduleUpsertRequest
 import { PUNCH_METHOD_OPTIONS } from '../types'
 import { shortenAddressCandidates } from '../utils/shortenAddressCandidates'
 import { formatDateTime } from '../utils/formatDateTime'
+import { compareNumbers, compareStrings } from '../utils/tableSort'
 
 const DEFAULT_CENTER: [number, number] = [23.9739, 120.9797] // 台灣中心點，還沒有座標時的預設地圖中心
 
@@ -71,6 +72,7 @@ interface ScheduleFormValues {
   addr?: string
   punchMethod?: string
   gpsRadiusMeters?: number
+  descr?: string
 }
 
 export default function ComTimeScheduleList() {
@@ -202,8 +204,8 @@ export default function ComTimeScheduleList() {
   const copyFromTemplate = () => {
     if (!templateCompany || !companyId || !dispatchCaseId) return
     Modal.confirm({
-      title: '確定要從樣板公司的個案複製班表？',
-      content: `樣板公司：${templateCompany.chName}，同班別代碼的班表不會重複複製，複製後可自行修改。`,
+      title: '確定要從樣板客戶的個案複製班表？',
+      content: `樣板客戶：${templateCompany.chName}，同班別代碼的班表不會重複複製，複製後可自行修改。`,
       onOk: async () => {
         setCopyingFromTemplate(true)
         try {
@@ -238,6 +240,7 @@ export default function ComTimeScheduleList() {
         addr: row.addr ?? undefined,
         punchMethod: row.punchMethod ?? 'GPS',
         gpsRadiusMeters: row.gpsRadiusMeters ?? 200,
+        descr: row.descr ?? undefined,
       })
       setUseCustomLocation(row.useCustomLocation)
       setSavedPosition(row.latitude != null && row.longitude != null ? [row.latitude, row.longitude] : null)
@@ -303,6 +306,7 @@ export default function ComTimeScheduleList() {
         longitude: values.useCustomLocation ? savedPosition?.[1] : undefined,
         punchMethod: values.useCustomLocation ? values.punchMethod : undefined,
         gpsRadiusMeters: values.useCustomLocation ? values.gpsRadiusMeters : undefined,
+        descr: values.descr,
       }
       setSaving(true)
       if (editing === 'new') {
@@ -351,6 +355,7 @@ export default function ComTimeScheduleList() {
         longitude: row.longitude ?? undefined,
         punchMethod: row.punchMethod ?? undefined,
         gpsRadiusMeters: row.gpsRadiusMeters ?? undefined,
+        descr: row.descr ?? undefined,
       }
       await apiClient.post(basePath, body)
       message.success(`已複製為「${newWorkType}」`)
@@ -381,29 +386,65 @@ export default function ComTimeScheduleList() {
     })
   }
 
+  const addrLabel = (record: ComTimeScheduleItem) =>
+    record.useCustomLocation ? record.addr ?? '(未設定地址)' : '客戶預設地址'
+  const punchMethodLabel = (record: ComTimeScheduleItem) =>
+    record.useCustomLocation
+      ? PUNCH_METHOD_OPTIONS.find((o) => o.value === record.punchMethod)?.label ?? record.punchMethod ?? '-'
+      : '(依客戶設定)'
+
   const columns: ColumnsType<ComTimeScheduleItem> = [
-    { title: '班別編號', dataIndex: 'workType', key: 'workType' },
-    { title: '上班時間', dataIndex: 'onTime', key: 'onTime' },
-    { title: '下班時間', dataIndex: 'offTime', key: 'offTime' },
-    { title: '午休開始', dataIndex: 'noonBreakStartTime', key: 'noonBreakStartTime' },
-    { title: '午休結束', dataIndex: 'noonBreakEndTime', key: 'noonBreakEndTime' },
+    {
+      title: '班別編號',
+      dataIndex: 'workType',
+      key: 'workType',
+      sorter: (a, b) => compareStrings(a.workType, b.workType),
+    },
+    { title: '上班時間', dataIndex: 'onTime', key: 'onTime', sorter: (a, b) => compareStrings(a.onTime, b.onTime) },
+    {
+      title: '下班時間',
+      dataIndex: 'offTime',
+      key: 'offTime',
+      sorter: (a, b) => compareStrings(a.offTime, b.offTime),
+    },
+    {
+      title: '午休開始',
+      dataIndex: 'noonBreakStartTime',
+      key: 'noonBreakStartTime',
+      sorter: (a, b) => compareStrings(a.noonBreakStartTime, b.noonBreakStartTime),
+    },
+    {
+      title: '午休結束',
+      dataIndex: 'noonBreakEndTime',
+      key: 'noonBreakEndTime',
+      sorter: (a, b) => compareStrings(a.noonBreakEndTime, b.noonBreakEndTime),
+    },
     {
       title: '工作地點',
       key: 'addr',
-      render: (_, record) => (record.useCustomLocation ? record.addr ?? '(未設定地址)' : '客戶預設地址'),
+      render: (_, record) => addrLabel(record),
+      sorter: (a, b) => compareStrings(addrLabel(a), addrLabel(b)),
     },
     {
       title: '打卡方式',
       key: 'punchMethod',
-      render: (_, record) =>
-        record.useCustomLocation
-          ? PUNCH_METHOD_OPTIONS.find((o) => o.value === record.punchMethod)?.label ?? record.punchMethod ?? '-'
-          : '(依客戶設定)',
+      render: (_, record) => punchMethodLabel(record),
+      sorter: (a, b) => compareStrings(punchMethodLabel(a), punchMethodLabel(b)),
     },
     {
       title: 'GPS打卡有效半徑(公尺)',
       key: 'gpsRadiusMeters',
       render: (_, record) => (record.useCustomLocation ? record.gpsRadiusMeters ?? '-' : '(依客戶設定)'),
+      sorter: (a, b) =>
+        compareNumbers(a.useCustomLocation ? a.gpsRadiusMeters : null, b.useCustomLocation ? b.gpsRadiusMeters : null),
+    },
+    {
+      title: '備註',
+      dataIndex: 'descr',
+      key: 'descr',
+      ellipsis: true,
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.descr, b.descr),
     },
     {
       title: '操作',
@@ -448,11 +489,14 @@ export default function ComTimeScheduleList() {
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
           <Select
-            style={{ width: 240 }}
+            style={{ width: 360 }}
             placeholder="選擇客戶"
             value={companyId}
             onChange={changeCompany}
-            options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+            options={companies.map((c) => ({
+              value: c.id,
+              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+            }))}
           />
           <span>選擇個案：</span>
           <Select
@@ -464,7 +508,7 @@ export default function ComTimeScheduleList() {
             options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
           />
           <Button onClick={copyFromTemplate} loading={copyingFromTemplate} disabled={!canCopyFromTemplate}>
-            複製樣板公司個案班表
+            複製樣板客戶個案班表
           </Button>
         </Space>
         <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
@@ -558,6 +602,9 @@ export default function ComTimeScheduleList() {
               </Form.Item>
             </>
           )}
+          <Form.Item name="descr" label="備註">
+            <Input.TextArea placeholder="備註" rows={3} />
+          </Form.Item>
         </Form>
         {editing && editing !== 'new' && (
           <div style={{ fontSize: 12, color: '#999' }}>

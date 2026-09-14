@@ -16,6 +16,7 @@ interface ManagerFormValues {
   email: string
   enabled: string
   role: string
+  descr?: string
 }
 
 export default function ManagerForm() {
@@ -43,6 +44,7 @@ export default function ManagerForm() {
           email: res.data.email,
           enabled: res.data.enabled,
           role: res.data.role,
+          descr: res.data.descr ?? undefined,
         })
       })
       .catch((err) => {
@@ -92,6 +94,7 @@ export default function ManagerForm() {
           email: values.email,
           enabled: values.enabled,
           role: values.role,
+          descr: values.descr,
         }
         await apiClient.put(`/admin/managers/${id}`, body)
         message.success('已更新使用者')
@@ -104,6 +107,7 @@ export default function ManagerForm() {
           enabled: values.enabled,
           role: values.role,
           salesSerial: confirmedSalesSerial ?? undefined,
+          descr: values.descr,
         }
         await apiClient.post('/admin/managers', body)
         message.success('已新增使用者')
@@ -212,6 +216,9 @@ export default function ManagerForm() {
             {/* enabled為舊ZK系統遺留的字串型boolean-ish欄位，新畫面簡化為啟用/停用兩個選項 */}
             <Form.Item name="enabled" label="狀態" rules={[{ required: true, message: '請選擇狀態' }]}>
               <Select options={ENABLED_OPTIONS} placeholder="請選擇狀態" />
+            </Form.Item>
+            <Form.Item name="descr" label="備註">
+              <Input.TextArea placeholder="備註" rows={3} />
             </Form.Item>
             {isEdit && detail && (
               <div style={{ marginBottom: 16, fontSize: 12, color: '#999' }}>

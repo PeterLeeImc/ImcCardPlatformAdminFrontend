@@ -8,6 +8,7 @@ import type { CompanyListItem, DispatchCaseItem, LogPage, WebLeaveTypeItem, WebL
 import { ANNUAL_EFFECTIVE_DATE_OPTIONS, SET_MODE_OPTIONS } from '../types'
 import { formatDate } from '../utils/formatDate'
 import { formatDateTime } from '../utils/formatDateTime'
+import { compareDates, compareNumbers, compareStrings } from '../utils/tableSort'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
 const DATE_FORMAT = 'YYYY/MM/DD'
@@ -114,6 +115,7 @@ export default function CompanyLeaveTypeList() {
       jobWorkDay: row.jobWorkDay,
       annualEffectiveDate: row.annualEffectiveDate,
       accumulatingLeaveType: row.accumulatingLeaveType,
+      descr: row.descr,
     })
   }
 
@@ -141,17 +143,57 @@ export default function CompanyLeaveTypeList() {
   }
 
   const columns: ColumnsType<WebLeaveTypeItem> = [
-    { title: '假別', dataIndex: 'leaveTypeName', key: 'leaveTypeName' },
-    { title: '起日', dataIndex: 'startDate', key: 'startDate', render: formatDate },
-    { title: '迄日', dataIndex: 'endDate', key: 'endDate', render: formatDate },
+    {
+      title: '假別',
+      dataIndex: 'leaveTypeName',
+      key: 'leaveTypeName',
+      sorter: (a, b) => compareStrings(a.leaveTypeName, b.leaveTypeName),
+    },
+    {
+      title: '起日',
+      dataIndex: 'startDate',
+      key: 'startDate',
+      render: formatDate,
+      sorter: (a, b) => compareDates(a.startDate, b.startDate),
+    },
+    {
+      title: '迄日',
+      dataIndex: 'endDate',
+      key: 'endDate',
+      render: formatDate,
+      sorter: (a, b) => compareDates(a.endDate, b.endDate),
+    },
     {
       title: '設定方式',
       dataIndex: 'setMode',
       key: 'setMode',
       render: (v: string) => SET_MODE_OPTIONS.find((o) => o.value === v)?.label ?? v,
+      sorter: (a, b) =>
+        compareStrings(
+          SET_MODE_OPTIONS.find((o) => o.value === a.setMode)?.label ?? a.setMode,
+          SET_MODE_OPTIONS.find((o) => o.value === b.setMode)?.label ?? b.setMode,
+        ),
     },
-    { title: '預設時數', dataIndex: 'defaultHours', key: 'defaultHours' },
-    { title: '到職滿(天)', dataIndex: 'jobWorkDay', key: 'jobWorkDay' },
+    {
+      title: '預設時數',
+      dataIndex: 'defaultHours',
+      key: 'defaultHours',
+      sorter: (a, b) => compareNumbers(a.defaultHours, b.defaultHours),
+    },
+    {
+      title: '到職滿(天)',
+      dataIndex: 'jobWorkDay',
+      key: 'jobWorkDay',
+      sorter: (a, b) => compareNumbers(a.jobWorkDay, b.jobWorkDay),
+    },
+    {
+      title: '備註',
+      dataIndex: 'descr',
+      key: 'descr',
+      ellipsis: true,
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.descr, b.descr),
+    },
     {
       title: '操作',
       key: 'action',
@@ -180,11 +222,14 @@ export default function CompanyLeaveTypeList() {
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
           <Select
-            style={{ width: 240 }}
+            style={{ width: 360 }}
             placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
-            options={companies.map((c) => ({ value: c.id, label: `${c.companyNum} ${c.chName}` }))}
+            options={companies.map((c) => ({
+              value: c.id,
+              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+            }))}
           />
           <span>選擇派遣個案：</span>
           <Select
@@ -233,6 +278,9 @@ export default function CompanyLeaveTypeList() {
           </Form.Item>
           <Form.Item name="annualEffectiveDate" label="年假生效日規則">
             <Select options={ANNUAL_EFFECTIVE_DATE_OPTIONS} allowClear />
+          </Form.Item>
+          <Form.Item name="descr" label="備註" extra="排程執行「年資轉年假」每日累加時，也會自動在這裡附加說明">
+            <Input.TextArea placeholder="備註" rows={3} />
           </Form.Item>
         </Form>
         {editing && (
