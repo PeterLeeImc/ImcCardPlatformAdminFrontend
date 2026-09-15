@@ -126,15 +126,15 @@ export default function WorkOvertimeList() {
 
   const handleDelete = (row: WorkOvertimeItem) => {
     Modal.confirm({
-      title: isAdvisorRole() ? '確定要隱藏這個加班別？' : '確定要刪除這個加班別？',
+      title: '確定要刪除這個加班別？',
       content: isAdvisorRole()
-        ? `加班別：${row.chName}，隱藏後系統管理者/系統使用者可以還原。`
+        ? `加班別：${row.chName}，刪除後系統管理者/系統使用者可以還原。`
         : `加班別：${row.chName}`,
       okType: 'danger',
       onOk: async () => {
         try {
           await apiClient.delete(`/admin/work-overtimes/${row.id}`)
-          message.success(isAdvisorRole() ? '已隱藏' : '刪除成功')
+          message.success('刪除成功')
           fetchRows()
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }

@@ -141,13 +141,13 @@ export default function LeaveTypeList() {
 
   const handleDelete = (row: LeaveTypeMasterItem) => {
     Modal.confirm({
-      title: isAdvisorRole() ? '確定要隱藏這個假別？' : '確定要刪除這個假別？',
-      content: isAdvisorRole() ? `假別：${row.chname}，隱藏後系統管理者/系統使用者可以還原。` : `假別：${row.chname}`,
+      title: '確定要刪除這個假別？',
+      content: isAdvisorRole() ? `假別：${row.chname}，刪除後系統管理者/系統使用者可以還原。` : `假別：${row.chname}`,
       okType: 'danger',
       onOk: async () => {
         try {
           await apiClient.delete(`/admin/leave-types/${row.id}`)
-          message.success(isAdvisorRole() ? '已隱藏' : '刪除成功')
+          message.success('刪除成功')
           fetchRows()
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }

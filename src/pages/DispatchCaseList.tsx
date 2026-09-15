@@ -105,15 +105,15 @@ export default function DispatchCaseList() {
   const handleDelete = (row: DispatchCaseItem) => {
     if (!companyId) return
     Modal.confirm({
-      title: isAdvisorRole() ? '確定要隱藏這個個案？' : '確定要刪除這個個案？',
+      title: '確定要刪除這個個案？',
       content: isAdvisorRole()
-        ? `個案編號：${row.caseCode}，隱藏後系統管理者/系統使用者可以還原。`
+        ? `個案編號：${row.caseCode}，刪除後系統管理者/系統使用者可以還原。`
         : `個案編號：${row.caseCode}`,
       okType: 'danger',
       onOk: async () => {
         try {
           await apiClient.delete(`/admin/companies/${companyId}/dispatch-cases/${row.id}`)
-          message.success(isAdvisorRole() ? '已隱藏' : '刪除成功')
+          message.success('刪除成功')
           fetchRows()
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }

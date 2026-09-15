@@ -90,15 +90,15 @@ export default function CompanyList() {
 
   const handleDelete = (record: CompanyListItem) => {
     Modal.confirm({
-      title: isAdvisorRole() ? '確定要隱藏這家客戶？' : '確定要刪除這家客戶？',
+      title: '確定要刪除這家客戶？',
       content: isAdvisorRole()
-        ? `客戶編號：${record.companyNum}，隱藏後系統管理者/系統使用者可以還原。`
+        ? `客戶編號：${record.companyNum}，刪除後系統管理者/系統使用者可以還原。`
         : `客戶編號：${record.companyNum}`,
       okType: 'danger',
       onOk: async () => {
         try {
           await apiClient.delete(`/admin/companies/${record.id}`)
-          message.success(isAdvisorRole() ? '已隱藏' : '刪除成功')
+          message.success('刪除成功')
           fetchCompanies(page, includeHidden)
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
@@ -213,11 +213,12 @@ export default function CompanyList() {
               onClick={() => navigate(`/dispatch-cases?companyId=${record.id}`)}
             />
             <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => navigate(`/companies/${record.id}`)} />
-            {record.template ? (
-              <ActionIcon title="取消樣板" icon={<StarFilled />} onClick={() => handleUnsetTemplate(record)} />
-            ) : (
-              <ActionIcon title="設為樣板" icon={<StarOutlined />} onClick={() => handleSetTemplate(record)} />
-            )}
+            {!isAdvisorRole() &&
+              (record.template ? (
+                <ActionIcon title="取消樣板" icon={<StarFilled />} onClick={() => handleUnsetTemplate(record)} />
+              ) : (
+                <ActionIcon title="設為樣板" icon={<StarOutlined />} onClick={() => handleSetTemplate(record)} />
+              ))}
             <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
           </Space>
         ),

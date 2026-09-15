@@ -168,15 +168,15 @@ export default function EmployeeList() {
 
   const handleDelete = (record: EmployeeListItem) => {
     Modal.confirm({
-      title: isAdvisorRole() ? '確定要隱藏此員工？' : '確定要刪除此員工？',
+      title: '確定要刪除此員工？',
       content: isAdvisorRole()
-        ? `員工編號：${record.employeenum}，隱藏後系統管理者/系統使用者可以還原。`
+        ? `員工編號：${record.employeenum}，刪除後系統管理者/系統使用者可以還原。`
         : `員工編號：${record.employeenum}`,
       okType: 'danger',
       onOk: async () => {
         try {
           await apiClient.delete(`/admin/employees/${record.id}`)
-          message.success(isAdvisorRole() ? '已隱藏' : '刪除成功')
+          message.success('刪除成功')
           fetchRows(page)
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
