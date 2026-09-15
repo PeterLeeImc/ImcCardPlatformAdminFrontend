@@ -13,6 +13,7 @@ import type {
 } from '../types'
 import { EMPLOYEE_ROLE_OPTIONS, JOB_STATUS_OPTIONS, SEX_OPTIONS } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
+import PageHeader from '../components/PageHeader'
 
 const DATE_FORMAT = 'YYYY/MM/DD'
 const WIRE_DATE_FORMAT = 'YYYY-MM-DD'
@@ -183,20 +184,14 @@ export default function EmployeeForm() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/employees')}>員工維護</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>{isEdit ? '編輯員工' : '新增員工'}</span>
-        </Space>
-      </div>
+      <PageHeader
+        title={
+          <Space>
+            <a onClick={() => navigate('/employees')}>員工維護</a>
+            <span style={{ fontSize: 18, fontWeight: 600 }}>{isEdit ? '編輯員工' : '新增員工'}</span>
+          </Space>
+        }
+      />
       <div style={{ maxWidth: 560, margin: '32px auto', width: '100%', background: '#fff', borderRadius: 12, padding: 32 }}>
         <Spin spinning={loading}>
           {!isEdit && (
@@ -224,17 +219,9 @@ export default function EmployeeForm() {
             initialValues={{ role: '006', jobStatus: '001', sex: '001', takeDate: dayjs() }}
           >
             {isEdit ? (
-              <>
-                <Form.Item label="員工編號">
-                  <Input value={detail?.employeenum ?? ''} disabled />
-                </Form.Item>
-                <Form.Item label="客戶名稱">
-                  <Input value={detail?.companyName ?? ''} disabled />
-                </Form.Item>
-                <Form.Item label="個案編號">
-                  <Input value={detail?.dispatchCaseCode ?? '未設定'} disabled />
-                </Form.Item>
-              </>
+              <Form.Item label="員工編號">
+                <Input value={detail?.employeenum ?? ''} disabled />
+              </Form.Item>
             ) : (
               <>
                 <Form.Item name="employeenum" label="員工編號" rules={[{ required: true, message: '請輸入員工編號' }]}>
@@ -285,21 +272,12 @@ export default function EmployeeForm() {
                 <DatePicker format={DATE_FORMAT} />
               </Form.Item>
             </Space>
-            <Form.Item
-              name="chargeHeadNum"
-              label="簽核人員工編號"
-              tooltip="輸入另一位員工的員工編號，儲存後系統會自動查找、算出真正的簽核主管"
-            >
+            <Form.Item name="chargeHeadNum" label="簽核人員工編號">
               <Input placeholder="員工編號" />
             </Form.Item>
             <Form.Item name="descr" label="備註">
               <Input.TextArea placeholder="備註" rows={3} />
             </Form.Item>
-            {isEdit && detail?.realChargeHeadNum && (
-              <div style={{ marginTop: -16, marginBottom: 16, fontSize: 12, color: '#999' }}>
-                目前算出的簽核主管：{detail.realChargeHeadNum}
-              </div>
-            )}
             {isEdit && detail && (
               <div style={{ marginBottom: 16, fontSize: 12, color: '#999' }}>
                 建立時間：{formatDateTime(detail.createdAt)}　建立者：{detail.createdBy ?? '-'}　異動時間：

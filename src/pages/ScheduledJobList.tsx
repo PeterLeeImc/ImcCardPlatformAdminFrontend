@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Layout, Modal, Space, Switch, Table, Tag, TimePicker, message } from 'antd'
+import { ClockCircleOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { apiClient } from '../api/client'
 import type { ScheduledJobItem, ScheduledJobUpdateRequest } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
+import PageHeader from '../components/PageHeader'
+import ActionIcon from '../components/ActionIcon'
 
 const TIME_FORMAT = 'HH:mm'
 
@@ -26,7 +28,6 @@ function timeToCron(time: dayjs.Dayjs): string {
 }
 
 export default function ScheduledJobList() {
-  const navigate = useNavigate()
   const [rows, setRows] = useState<ScheduledJobItem[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<ScheduledJobItem>()
@@ -150,11 +151,14 @@ export default function ScheduledJobList() {
       key: 'action',
       width: 140,
       render: (_, record) => (
-        <Space>
-          <a onClick={() => openEdit(record)}>設定時間</a>
-          <a onClick={() => (running ? undefined : runNow(record))} aria-disabled={running === record.jobKey}>
-            {running === record.jobKey ? '執行中...' : '手動執行'}
-          </a>
+        <Space size="small">
+          <ActionIcon title="設定時間" icon={<ClockCircleOutlined />} onClick={() => openEdit(record)} />
+          <ActionIcon
+            title={running === record.jobKey ? '執行中...' : '手動執行'}
+            icon={<PlayCircleOutlined />}
+            disabled={running === record.jobKey}
+            onClick={() => runNow(record)}
+          />
         </Space>
       ),
     },
@@ -162,20 +166,7 @@ export default function ScheduledJobList() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>排程管理</span>
-        </Space>
-      </div>
+      <PageHeader title="排程管理" />
       <div style={{ padding: 24 }}>
         <Table rowKey="jobKey" loading={loading} columns={columns} dataSource={rows} pagination={false} />
       </div>

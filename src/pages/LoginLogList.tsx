@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Button, DatePicker, Form, Input, Layout, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import { apiClient } from '../api/client'
 import type { LogPage, RwdLoginLogItem } from '../types'
 import { compareDates, compareStrings } from '../utils/tableSort'
+import PageHeader from '../components/PageHeader'
 
 const PAGE_SIZE = 20
 
@@ -15,7 +15,6 @@ interface FilterValues {
 }
 
 export default function LoginLogList() {
-  const navigate = useNavigate()
   const [form] = Form.useForm<FilterValues>()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<LogPage<RwdLoginLogItem>>()
@@ -79,20 +78,7 @@ export default function LoginLogList() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>登入紀錄</span>
-        </Space>
-      </div>
+      <PageHeader title="登入紀錄" />
       <div style={{ padding: 24 }}>
         <Form form={form} layout="inline" onFinish={onSearch} style={{ marginBottom: 16 }}>
           <Form.Item name="range" label="日期區間">

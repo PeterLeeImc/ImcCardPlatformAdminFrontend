@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Checkbox, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
+import { DeleteOutlined, EditOutlined, KeyOutlined, UndoOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, EmployeeListItem, LogPage } from '../types'
-import { SEX_OPTIONS } from '../types'
+import { JOB_STATUS_OPTIONS, SEX_OPTIONS } from '../types'
+import PageHeader from '../components/PageHeader'
+import ActionIcon from '../components/ActionIcon'
 import { formatDate } from '../utils/formatDate'
 import { imcEmployeeDetailUrl } from '../utils/imcLinks'
 import { compareDates, compareNumbers, compareStrings } from '../utils/tableSort'
@@ -26,6 +29,7 @@ export default function EmployeeList() {
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(false)
   const [includeHidden, setIncludeHidden] = useState(false)
+  const [jobStatus, setJobStatus] = useState('001')
 
   useEffect(() => {
     apiClient
@@ -88,6 +92,7 @@ export default function EmployeeList() {
         params: {
           companyId,
           dispatchCaseId,
+          jobStatus: jobStatus || undefined,
           includeHidden,
           page: targetPage,
           size: PAGE_SIZE,
@@ -104,7 +109,7 @@ export default function EmployeeList() {
   useEffect(() => {
     fetchRows(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, dispatchCaseId, includeHidden, page])
+  }, [companyId, dispatchCaseId, jobStatus, includeHidden, page])
 
   const changeCompany = (v: number | undefined) => {
     setSearchParams(
@@ -230,12 +235,6 @@ export default function EmployeeList() {
       sorter: (a, b) => compareStrings(a.roleLabel, b.roleLabel),
     },
     {
-      title: '在職狀態',
-      dataIndex: 'jobStatusLabel',
-      key: 'jobStatusLabel',
-      sorter: (a, b) => compareStrings(a.jobStatusLabel, b.jobStatusLabel),
-    },
-    {
       title: '性別',
       dataIndex: 'sex',
       key: 'sex',
@@ -290,16 +289,14 @@ export default function EmployeeList() {
       key: 'action',
       render: (_, record) =>
         record.hidden ? (
-          <Space size="middle">
-            <a onClick={() => handleRestore(record)}>還原</a>
+          <Space size="small">
+            <ActionIcon title="還原" icon={<UndoOutlined />} onClick={() => handleRestore(record)} />
           </Space>
         ) : (
-          <Space size="middle">
-            <a onClick={() => navigate(`/employees/${record.id}`)}>編輯</a>
-            <a onClick={() => openResetPassword(record)}>重設密碼</a>
-            <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-              刪除
-            </a>
+          <Space size="small">
+            <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => navigate(`/employees/${record.id}`)} />
+            <ActionIcon title="重設密碼" icon={<KeyOutlined />} onClick={() => openResetPassword(record)} />
+            <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
           </Space>
         ),
     },
@@ -307,33 +304,23 @@ export default function EmployeeList() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>員工維護</span>
-        </Space>
-        <Button
-          type="primary"
-          onClick={() => {
-            const params = new URLSearchParams()
-            if (companyId) params.set('companyId', String(companyId))
-            if (dispatchCaseId) params.set('dispatchCaseId', String(dispatchCaseId))
-            navigate(`/employees/new?${params.toString()}`)
-          }}
-          disabled={!companyId}
-        >
-          新增員工
-        </Button>
-      </div>
+      <PageHeader
+        title="員工維護"
+        actions={
+          <Button
+            type="primary"
+            onClick={() => {
+              const params = new URLSearchParams()
+              if (companyId) params.set('companyId', String(companyId))
+              if (dispatchCaseId) params.set('dispatchCaseId', String(dispatchCaseId))
+              navigate(`/employees/new?${params.toString()}`)
+            }}
+            disabled={!companyId}
+          >
+            新增員工
+          </Button>
+        }
+      />
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
@@ -354,6 +341,15 @@ export default function EmployeeList() {
             value={dispatchCaseId}
             onChange={changeDispatchCase}
             options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
+          />
+          <span>在職狀態：</span>
+          <Select
+            style={{ width: 140 }}
+            allowClear
+            placeholder="全部"
+            value={jobStatus || undefined}
+            onChange={(v) => setJobStatus(v ?? '')}
+            options={JOB_STATUS_OPTIONS}
           />
           {!isAdvisorRole() && (
             <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>

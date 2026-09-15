@@ -9,6 +9,7 @@ import type { CompanyCreateRequest, CompanyDetail, CompanyUpdateRequest, Custome
 import { PUNCH_METHOD_OPTIONS } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
 import { shortenAddressCandidates } from '../utils/shortenAddressCandidates'
+import PageHeader from '../components/PageHeader'
 
 const DEFAULT_CENTER: [number, number] = [23.9739, 120.9797] // 台灣中心點，還沒有座標時的預設地圖中心
 
@@ -220,28 +221,21 @@ export default function CompanyForm() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/companies')}>客戶維護</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>{isEdit ? '編輯客戶' : '新增客戶'}</span>
-        </Space>
-        {isEdit && <a onClick={() => navigate(`/dispatch-cases?companyId=${id}`)}>前往個案維護 / 班表 →</a>}
-      </div>
+      <PageHeader
+        title={
+          <Space>
+            <a onClick={() => navigate('/companies')}>客戶維護</a>
+            <span style={{ fontSize: 18, fontWeight: 600 }}>{isEdit ? '編輯客戶' : '新增客戶'}</span>
+          </Space>
+        }
+        actions={isEdit && <a onClick={() => navigate(`/dispatch-cases?companyId=${id}`)}>前往個案維護 / 班表 →</a>}
+      />
       <div style={{ maxWidth: 720, margin: '32px auto', width: '100%', background: '#fff', borderRadius: 12, padding: 32 }}>
         <Spin spinning={loading}>
           {!isEdit && (
             <div style={{ marginBottom: 24, padding: 16, background: '#f5f6f8', borderRadius: 8 }}>
               <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>
-                可先輸入客戶編號查詢IMC系統，自動帶入下方中文名稱/客戶簡稱/公司地址
+                可先輸入客戶編號查詢IMC系統，自動帶入下方客戶名稱/客戶簡稱/客戶地址
               </div>
               <Space.Compact style={{ width: '100%' }}>
                 <Input
@@ -276,16 +270,16 @@ export default function CompanyForm() {
                 <Input placeholder="客戶編號" />
               </Form.Item>
             )}
-            <Form.Item name="chName" label="中文名稱" rules={[{ required: true, message: '請輸入中文名稱' }]}>
-              <Input placeholder="中文名稱" />
+            <Form.Item name="chName" label="客戶名稱" rules={[{ required: true, message: '請輸入客戶名稱' }]}>
+              <Input placeholder="客戶名稱" />
             </Form.Item>
             <Form.Item name="name4Short" label="客戶簡稱" rules={[{ required: true, message: '請輸入客戶簡稱' }]}>
               <Input placeholder="客戶簡稱" />
             </Form.Item>
-            <Form.Item label="公司地址">
+            <Form.Item label="客戶地址">
               <Space.Compact style={{ width: '100%' }}>
                 <Form.Item name="addr" noStyle>
-                  <Input placeholder="公司地址" />
+                  <Input placeholder="客戶地址" />
                 </Form.Item>
                 <Button loading={geocoding} onClick={geocodeAddress}>
                   地址轉座標

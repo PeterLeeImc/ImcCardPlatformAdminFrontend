@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Button, DatePicker, Input, Layout, Modal, Select, Space, Upload, message } from 'antd'
 import { LeftOutlined, RightOutlined, UploadOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { apiClient } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, LeaveTypeMasterItem, LogPage } from '../types'
+import PageHeader from '../components/PageHeader'
 
 const LEAVE_DEFAULT_FILED_OFFICIAL = '010' // 公假
 
@@ -53,7 +53,6 @@ function addDays(d: Date, days: number) {
 }
 
 export default function EmpScheduleCalendar() {
-  const navigate = useNavigate()
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
@@ -409,29 +408,19 @@ export default function EmpScheduleCalendar() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>員工班段行事曆</span>
-        </Space>
-        <Space>
-          <Button onClick={openQuickAssign} disabled={!dispatchCaseId}>
-            快速排班
-          </Button>
-          <Button onClick={openOfficialLeave} disabled={!dispatchCaseId || officialLeaveTypes.length === 0}>
-            快速產生公假
-          </Button>
-        </Space>
-      </div>
+      <PageHeader
+        title="員工班段行事曆"
+        actions={
+          <Space>
+            <Button onClick={openQuickAssign} disabled={!dispatchCaseId}>
+              快速排班
+            </Button>
+            <Button onClick={openOfficialLeave} disabled={!dispatchCaseId || officialLeaveTypes.length === 0}>
+              快速產生公假
+            </Button>
+          </Space>
+        }
+      />
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
@@ -445,10 +434,10 @@ export default function EmpScheduleCalendar() {
               label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
             }))}
           />
-          <span>選擇派遣個案：</span>
+          <span>選擇個案：</span>
           <Select
             style={{ width: 200 }}
-            placeholder="選擇派遣個案"
+            placeholder="選擇個案"
             value={dispatchCaseId}
             onChange={setDispatchCaseId}
             options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}

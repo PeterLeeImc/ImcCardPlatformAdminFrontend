@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Button, DatePicker, Form, Input, InputNumber, Layout, Modal, Select, Space, Table, message } from 'antd'
+import { EditOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { apiClient } from '../api/client'
@@ -9,13 +9,14 @@ import { ANNUAL_EFFECTIVE_DATE_OPTIONS, SET_MODE_OPTIONS } from '../types'
 import { formatDate } from '../utils/formatDate'
 import { formatDateTime } from '../utils/formatDateTime'
 import { compareDates, compareNumbers, compareStrings } from '../utils/tableSort'
+import PageHeader from '../components/PageHeader'
+import ActionIcon from '../components/ActionIcon'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
 const DATE_FORMAT = 'YYYY/MM/DD'
 const WIRE_DATE_FORMAT = 'YYYY-MM-DD'
 
 export default function CompanyLeaveTypeList() {
-  const navigate = useNavigate()
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [companyId, setCompanyId] = useState<number>()
   const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
@@ -197,27 +198,13 @@ export default function CompanyLeaveTypeList() {
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => <a onClick={() => openEdit(record)}>編輯</a>,
+      render: (_, record) => <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />,
     },
   ]
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>客戶配假設定</span>
-        </Space>
-      </div>
+      <PageHeader title="客戶配假設定" />
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
@@ -231,10 +218,10 @@ export default function CompanyLeaveTypeList() {
               label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
             }))}
           />
-          <span>選擇派遣個案：</span>
+          <span>選擇個案：</span>
           <Select
             style={{ width: 200 }}
-            placeholder="選擇派遣個案"
+            placeholder="選擇個案"
             value={dispatchCaseId}
             onChange={setDispatchCaseId}
             options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}

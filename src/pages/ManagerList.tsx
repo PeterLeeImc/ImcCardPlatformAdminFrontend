@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Layout, Modal, Space, Table, Tag, message } from 'antd'
+import { DeleteOutlined, EditOutlined, KeyOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
 import type { ManagerListItem, ManagerPage } from '../types'
 import { ENABLED_OPTIONS } from '../types'
 import { compareStrings } from '../utils/tableSort'
+import PageHeader from '../components/PageHeader'
+import ActionIcon from '../components/ActionIcon'
 
 const PAGE_SIZE = 20
 
@@ -121,12 +124,10 @@ export default function ManagerList() {
       title: '操作',
       key: 'action',
       render: (_, record) => (
-        <Space size="middle">
-          <a onClick={() => navigate(`/managers/${record.id}`)}>編輯</a>
-          <a onClick={() => openResetPassword(record)}>重設密碼</a>
-          <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-            刪除
-          </a>
+        <Space size="small">
+          <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => navigate(`/managers/${record.id}`)} />
+          <ActionIcon title="重設密碼" icon={<KeyOutlined />} onClick={() => openResetPassword(record)} />
+          <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
         </Space>
       ),
     },
@@ -134,24 +135,14 @@ export default function ManagerList() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>使用者維護</span>
-        </Space>
-        <Button type="primary" onClick={() => navigate('/managers/new')}>
-          新增使用者
-        </Button>
-      </div>
+      <PageHeader
+        title="使用者維護"
+        actions={
+          <Button type="primary" onClick={() => navigate('/managers/new')}>
+            新增使用者
+          </Button>
+        }
+      />
       <div style={{ padding: 24 }}>
         <Table
           rowKey="id"

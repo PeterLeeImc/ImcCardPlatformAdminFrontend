@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Button, Checkbox, Form, Input, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
+import { DeleteOutlined, EditOutlined, UndoOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, LogPage, WorkOvertimeItem, WorkOvertimeUpsertRequest } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
 import { compareStrings } from '../utils/tableSort'
+import PageHeader from '../components/PageHeader'
+import ActionIcon from '../components/ActionIcon'
 
 export default function WorkOvertimeList() {
-  const navigate = useNavigate()
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [companyId, setCompanyId] = useState<number>()
   const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
@@ -190,15 +191,13 @@ export default function WorkOvertimeList() {
       key: 'action',
       render: (_, record) =>
         record.hidden ? (
-          <Space>
-            <a onClick={() => handleRestore(record)}>還原</a>
+          <Space size="small">
+            <ActionIcon title="還原" icon={<UndoOutlined />} onClick={() => handleRestore(record)} />
           </Space>
         ) : (
-          <Space>
-            <a onClick={() => openEdit(record)}>編輯</a>
-            <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-              刪除
-            </a>
+          <Space size="small">
+            <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+            <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
           </Space>
         ),
     },
@@ -206,24 +205,14 @@ export default function WorkOvertimeList() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>加班別維護</span>
-        </Space>
-        <Button type="primary" onClick={() => openEdit('new')} disabled={!dispatchCaseId}>
-          新增加班別
-        </Button>
-      </div>
+      <PageHeader
+        title="加班別維護"
+        actions={
+          <Button type="primary" onClick={() => openEdit('new')} disabled={!dispatchCaseId}>
+            新增加班別
+          </Button>
+        }
+      />
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>
@@ -237,10 +226,10 @@ export default function WorkOvertimeList() {
               label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
             }))}
           />
-          <span>選擇派遣個案：</span>
+          <span>選擇個案：</span>
           <Select
             style={{ width: 200 }}
-            placeholder="選擇派遣個案"
+            placeholder="選擇個案"
             value={dispatchCaseId}
             onChange={setDispatchCaseId}
             options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}

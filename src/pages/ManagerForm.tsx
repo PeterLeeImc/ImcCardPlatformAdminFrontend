@@ -5,6 +5,7 @@ import { apiClient } from '../api/client'
 import type { ManagerCreateRequest, ManagerDetail, ManagerUpdateRequest, SalesLookupResult } from '../types'
 import { ENABLED_OPTIONS, MANAGER_ROLE_OPTIONS } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
+import PageHeader from '../components/PageHeader'
 
 const PASSWORD_RULE = /^[a-zA-Z][0-9a-zA-Z]{3,}$/
 const SALES_ROLE = '004'
@@ -123,20 +124,14 @@ export default function ManagerForm() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/managers')}>使用者維護</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>{isEdit ? '編輯使用者' : '新增使用者'}</span>
-        </Space>
-      </div>
+      <PageHeader
+        title={
+          <Space>
+            <a onClick={() => navigate('/managers')}>使用者維護</a>
+            <span style={{ fontSize: 18, fontWeight: 600 }}>{isEdit ? '編輯使用者' : '新增使用者'}</span>
+          </Space>
+        }
+      />
       <div style={{ maxWidth: 480, margin: '32px auto', width: '100%', background: '#fff', borderRadius: 12, padding: 32 }}>
         <Spin spinning={loading}>
           {!isEdit && (

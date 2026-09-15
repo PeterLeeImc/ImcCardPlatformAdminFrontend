@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Checkbox, Form, Input, Layout, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
+import { DeleteOutlined, EditOutlined, TableOutlined, TeamOutlined, UndoOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, DispatchCaseUpsertRequest, LogPage, ManagerOption } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
 import { imcDispatchCaseDetailUrl } from '../utils/imcLinks'
-import { compareDates, compareStrings } from '../utils/tableSort'
+import { compareStrings } from '../utils/tableSort'
+import PageHeader from '../components/PageHeader'
+import ActionIcon from '../components/ActionIcon'
 
 export default function DispatchCaseList() {
   const navigate = useNavigate()
@@ -188,47 +191,27 @@ export default function DispatchCaseList() {
       sorter: (a, b) => compareStrings(a.descr, b.descr),
     },
     {
-      title: '建立時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: formatDateTime,
-      sorter: (a, b) => compareDates(a.createdAt, b.createdAt),
-    },
-    {
-      title: '建立者',
-      dataIndex: 'createdBy',
-      key: 'createdBy',
-      sorter: (a, b) => compareStrings(a.createdBy, b.createdBy),
-    },
-    {
-      title: '異動時間',
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      render: formatDateTime,
-      sorter: (a, b) => compareDates(a.updatedAt, b.updatedAt),
-    },
-    {
-      title: '異動者',
-      dataIndex: 'updatedBy',
-      key: 'updatedBy',
-      sorter: (a, b) => compareStrings(a.updatedBy, b.updatedBy),
-    },
-    {
       title: '操作',
       key: 'action',
       render: (_, record) =>
         record.hidden ? (
-          <Space>
-            <a onClick={() => handleRestore(record)}>還原</a>
+          <Space size="small">
+            <ActionIcon title="還原" icon={<UndoOutlined />} onClick={() => handleRestore(record)} />
           </Space>
         ) : (
-          <Space>
-            <a onClick={() => navigate(`/time-schedules?companyId=${companyId}&dispatchCaseId=${record.id}`)}>班表</a>
-            <a onClick={() => navigate(`/employees?companyId=${companyId}&dispatchCaseId=${record.id}`)}>員工</a>
-            <a onClick={() => openEdit(record)}>編輯</a>
-            <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-              刪除
-            </a>
+          <Space size="small">
+            <ActionIcon
+              title="班表"
+              icon={<TableOutlined />}
+              onClick={() => navigate(`/time-schedules?companyId=${companyId}&dispatchCaseId=${record.id}`)}
+            />
+            <ActionIcon
+              title="員工"
+              icon={<TeamOutlined />}
+              onClick={() => navigate(`/employees?companyId=${companyId}&dispatchCaseId=${record.id}`)}
+            />
+            <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+            <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
           </Space>
         ),
     },
@@ -236,24 +219,14 @@ export default function DispatchCaseList() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>個案維護</span>
-        </Space>
-        <Button type="primary" onClick={() => openEdit('new')} disabled={!companyId}>
-          新增個案
-        </Button>
-      </div>
+      <PageHeader
+        title="個案維護"
+        actions={
+          <Button type="primary" onClick={() => openEdit('new')} disabled={!companyId}>
+            新增個案
+          </Button>
+        }
+      />
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }}>
           <span>選擇客戶：</span>

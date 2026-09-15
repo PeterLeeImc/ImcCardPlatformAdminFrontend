@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { Button, Form, Input, InputNumber, Layout, Modal, Select, Space, Switch, Table, message } from 'antd'
+import { CopyOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -11,6 +12,8 @@ import { PUNCH_METHOD_OPTIONS } from '../types'
 import { shortenAddressCandidates } from '../utils/shortenAddressCandidates'
 import { formatDateTime } from '../utils/formatDateTime'
 import { compareNumbers, compareStrings } from '../utils/tableSort'
+import PageHeader from '../components/PageHeader'
+import ActionIcon from '../components/ActionIcon'
 
 const DEFAULT_CENTER: [number, number] = [23.9739, 120.9797] // 台灣中心點，還沒有座標時的預設地圖中心
 
@@ -76,7 +79,6 @@ interface ScheduleFormValues {
 }
 
 export default function ComTimeScheduleList() {
-  const navigate = useNavigate()
   // 客戶/個案選擇直接以查詢字串為唯一資料來源，比照員工維護的做法，離開頁面再回來時篩選狀態還在。
   const [searchParams, setSearchParams] = useSearchParams()
   const companyId = searchParams.get('companyId') ? Number(searchParams.get('companyId')) : undefined
@@ -450,14 +452,15 @@ export default function ComTimeScheduleList() {
       title: '操作',
       key: 'action',
       render: (_, record) => (
-        <Space>
-          <a onClick={() => openEdit(record)}>編輯</a>
-          <a onClick={() => (copying ? undefined : handleCopy(record))} aria-disabled={copying === record.id}>
-            {copying === record.id ? '複製中...' : '複製'}
-          </a>
-          <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-            刪除
-          </a>
+        <Space size="small">
+          <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+          <ActionIcon
+            title={copying === record.id ? '複製中...' : '複製'}
+            icon={<CopyOutlined />}
+            disabled={copying === record.id}
+            onClick={() => handleCopy(record)}
+          />
+          <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
         </Space>
       ),
     },
@@ -467,24 +470,14 @@ export default function ComTimeScheduleList() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>班表維護</span>
-        </Space>
-        <Button type="primary" onClick={() => openEdit('new')} disabled={!dispatchCaseId}>
-          新增班表
-        </Button>
-      </div>
+      <PageHeader
+        title="班表維護"
+        actions={
+          <Button type="primary" onClick={() => openEdit('new')} disabled={!dispatchCaseId}>
+            新增班表
+          </Button>
+        }
+      />
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>

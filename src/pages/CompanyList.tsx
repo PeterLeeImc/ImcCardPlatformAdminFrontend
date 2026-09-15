@@ -1,11 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Checkbox, Layout, Modal, Space, Table, Tag, message } from 'antd'
+import {
+  ApartmentOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  StarFilled,
+  StarOutlined,
+  UndoOutlined,
+} from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
 import type { CompanyListItem, LogPage } from '../types'
+import { PUNCH_METHOD_OPTIONS } from '../types'
 import { imcCustomerDetailUrl } from '../utils/imcLinks'
-import { compareStrings } from '../utils/tableSort'
+import { compareNumbers, compareStrings } from '../utils/tableSort'
+import PageHeader from '../components/PageHeader'
+import ActionIcon from '../components/ActionIcon'
 
 const PAGE_SIZE = 20
 
@@ -154,6 +165,31 @@ export default function CompanyList() {
       sorter: (a, b) => compareStrings(a.name4Short, b.name4Short),
     },
     {
+      title: '客戶地址',
+      dataIndex: 'addr',
+      key: 'addr',
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.addr, b.addr),
+    },
+    {
+      title: '打卡方式',
+      dataIndex: 'punchMethod',
+      key: 'punchMethod',
+      render: (v: string | null) => PUNCH_METHOD_OPTIONS.find((o) => o.value === v)?.label ?? v ?? '-',
+      sorter: (a, b) =>
+        compareStrings(
+          PUNCH_METHOD_OPTIONS.find((o) => o.value === a.punchMethod)?.label ?? a.punchMethod,
+          PUNCH_METHOD_OPTIONS.find((o) => o.value === b.punchMethod)?.label ?? b.punchMethod,
+        ),
+    },
+    {
+      title: 'GPS打卡有效半徑(公尺)',
+      dataIndex: 'gpsRadiusMeters',
+      key: 'gpsRadiusMeters',
+      render: (v: number | null) => v ?? '-',
+      sorter: (a, b) => compareNumbers(a.gpsRadiusMeters, b.gpsRadiusMeters),
+    },
+    {
       title: '備註',
       dataIndex: 'descr',
       key: 'descr',
@@ -166,21 +202,23 @@ export default function CompanyList() {
       key: 'action',
       render: (_, record) =>
         record.hidden ? (
-          <Space size="middle">
-            <a onClick={() => handleRestore(record)}>還原</a>
+          <Space size="small">
+            <ActionIcon title="還原" icon={<UndoOutlined />} onClick={() => handleRestore(record)} />
           </Space>
         ) : (
-          <Space size="middle">
-            <a onClick={() => navigate(`/dispatch-cases?companyId=${record.id}`)}>個案維護/班表</a>
-            <a onClick={() => navigate(`/companies/${record.id}`)}>編輯</a>
+          <Space size="small">
+            <ActionIcon
+              title="個案維護/班表"
+              icon={<ApartmentOutlined />}
+              onClick={() => navigate(`/dispatch-cases?companyId=${record.id}`)}
+            />
+            <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => navigate(`/companies/${record.id}`)} />
             {record.template ? (
-              <a onClick={() => handleUnsetTemplate(record)}>取消樣板</a>
+              <ActionIcon title="取消樣板" icon={<StarFilled />} onClick={() => handleUnsetTemplate(record)} />
             ) : (
-              <a onClick={() => handleSetTemplate(record)}>設為樣板</a>
+              <ActionIcon title="設為樣板" icon={<StarOutlined />} onClick={() => handleSetTemplate(record)} />
             )}
-            <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-              刪除
-            </a>
+            <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
           </Space>
         ),
     },
@@ -188,24 +226,14 @@ export default function CompanyList() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>客戶維護</span>
-        </Space>
-        <Button type="primary" onClick={() => navigate('/companies/new')}>
-          新增客戶
-        </Button>
-      </div>
+      <PageHeader
+        title="客戶維護"
+        actions={
+          <Button type="primary" onClick={() => navigate('/companies/new')}>
+            新增客戶
+          </Button>
+        }
+      />
       <div style={{ padding: 24 }}>
         {!isAdvisorRole() && (
           <Checkbox

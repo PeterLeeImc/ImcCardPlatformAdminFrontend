@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Input, Layout, Modal, Space, Spin, message } from 'antd'
+import { Card, Input, Layout, Modal, Spin, message } from 'antd'
 import { apiClient, clearSessionAndRedirectToLogin, isSystemAdminRole } from '../api/client'
+import PageHeader from '../components/PageHeader'
 import {
   TeamOutlined,
   SafetyCertificateOutlined,
-  LogoutOutlined,
   HistoryOutlined,
   LoginOutlined,
   NotificationOutlined,
@@ -29,13 +29,6 @@ const RESET_CONFIRM_TEXT = 'RESET'
 
 export default function Home() {
   const navigate = useNavigate()
-  const chname = localStorage.getItem('platformChname') ?? ''
-  const companyName = localStorage.getItem('platformOperatingCompanyName')
-  const displayName = companyName ? `${companyName} - ${chname}` : chname
-
-  const logout = () => {
-    clearSessionAndRedirectToLogin()
-  }
 
   const [permissions, setPermissions] = useState<Set<string>>()
   const [resetModalOpen, setResetModalOpen] = useState(false)
@@ -229,24 +222,7 @@ export default function Home() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <span style={{ fontSize: 18, fontWeight: 600 }}>IMC打卡平台管理端</span>
-        <Space size={16}>
-          <span style={{ color: '#666' }}>{displayName} 您好</span>
-          <span onClick={logout} style={{ cursor: 'pointer', color: '#1677ff' }}>
-            <LogoutOutlined /> 登出
-          </span>
-        </Space>
-      </div>
+      <PageHeader title="IMC打卡平台管理端" />
       <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 24 }}>
         {!permissions ? (
           <div style={{ textAlign: 'center', padding: 40 }}>

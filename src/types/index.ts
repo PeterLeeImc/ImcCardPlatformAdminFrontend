@@ -170,6 +170,9 @@ export interface CompanyListItem {
   companyNum: string
   chName: string
   name4Short: string
+  addr: string | null
+  punchMethod: string | null
+  gpsRadiusMeters: number | null
   /** 樣板客戶：全系統同一時間只會有一家，見CompanyController.setTemplate()。 */
   template: boolean
   /** 顧問角色刪除只是隱藏(軟刪除)，系統管理者/系統使用者可以還原或真的刪除。 */
@@ -330,6 +333,7 @@ export interface LeaveTypeMasterItem {
   enname: string | null
   leaveDefaultFiled: string | null
   leaveSexCondition: string | null
+  minHours: number | null
   attachFileHours: number | null
   hidden: boolean
   descr: string | null
@@ -344,6 +348,7 @@ export interface LeaveTypeMasterUpsertRequest {
   enname?: string
   leaveDefaultFiled?: string
   leaveSexCondition?: string
+  minHours?: number
   attachFileHours?: number
   descr?: string
 }

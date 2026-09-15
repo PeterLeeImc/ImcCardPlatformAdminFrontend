@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Button, InputNumber, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, EmpDayCardRow, EmployeeListItem, LogPage } from '../types'
 import { formatDate } from '../utils/formatDate'
 import { compareDates, compareNumericLabels, compareStrings } from '../utils/tableSort'
+import PageHeader from '../components/PageHeader'
 
 const ALL_EMPLOYEES = 0
 const WHOLE_MONTH = 0
 const today = new Date()
 
 export default function EmpDayCardList() {
-  const navigate = useNavigate()
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [companyId, setCompanyId] = useState<number>()
   const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
@@ -183,20 +182,7 @@ export default function EmpDayCardList() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>員工每日打卡</span>
-        </Space>
-      </div>
+      <PageHeader title="員工每日打卡" />
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>

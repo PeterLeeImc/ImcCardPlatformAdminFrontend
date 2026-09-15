@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Button, InputNumber, Layout, Select, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient } from '../api/client'
 import type { AttendanceReportRow, CompanyListItem, DispatchCaseItem, EmployeeListItem, LogPage } from '../types'
 import { formatDate } from '../utils/formatDate'
 import { compareDates, compareNumericLabels, compareStrings } from '../utils/tableSort'
+import PageHeader from '../components/PageHeader'
 
 const ALL_EMPLOYEES = 0
 const today = new Date()
 
 export default function AttendanceDetailReport() {
-  const navigate = useNavigate()
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [companyId, setCompanyId] = useState<number>()
   const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
@@ -202,24 +201,14 @@ export default function AttendanceDetailReport() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>出勤明細報表</span>
-        </Space>
-        <Button onClick={exportExcel} loading={exporting} disabled={!companyId}>
-          匯出Excel
-        </Button>
-      </div>
+      <PageHeader
+        title="出勤明細報表"
+        actions={
+          <Button onClick={exportExcel} loading={exporting} disabled={!companyId}>
+            匯出Excel
+          </Button>
+        }
+      />
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 16 }} wrap>
           <span>選擇客戶：</span>

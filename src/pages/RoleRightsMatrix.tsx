@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Button, Checkbox, Collapse, Layout, Menu, Space, Spin, message } from 'antd'
+import { Button, Checkbox, Collapse, Layout, Menu, Spin, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { apiClient } from '../api/client'
 import type { RightDto, RoleDto, RoleRightsDto } from '../types'
+import PageHeader from '../components/PageHeader'
 
 const BACKOFFICE_MODULE = '後台作業'
 const PUNCH_MODULE = '打卡作業'
@@ -80,7 +80,6 @@ function rightLabel(right: RightDto): string {
 }
 
 export default function RoleRightsMatrix() {
-  const navigate = useNavigate()
   const [roles, setRoles] = useState<RoleDto[]>([])
   const [rights, setRights] = useState<RightDto[]>([])
   const [selectedRoleId, setSelectedRoleId] = useState<number>()
@@ -172,24 +171,14 @@ export default function RoleRightsMatrix() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>角色功能</span>
-        </Space>
-        <Button type="primary" onClick={handleSave} loading={saving} disabled={selectedRoleId == null}>
-          儲存
-        </Button>
-      </div>
+      <PageHeader
+        title="角色功能"
+        actions={
+          <Button type="primary" onClick={handleSave} loading={saving} disabled={selectedRoleId == null}>
+            儲存
+          </Button>
+        }
+      />
       <Spin spinning={loadingBase}>
         <div style={{ display: 'flex', padding: 24, gap: 24 }}>
           <div style={{ width: 220, background: '#fff', borderRadius: 8 }}>

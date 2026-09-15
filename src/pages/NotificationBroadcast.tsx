@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Button, DatePicker, Form, Input, Layout, Modal, Select, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
@@ -13,13 +12,13 @@ import type {
   LogPage,
 } from '../types'
 import { compareDates, compareStrings } from '../utils/tableSort'
+import PageHeader from '../components/PageHeader'
 
 const PAGE_SIZE = 20
 const ALL = 'ALL' as const
 type Choice = number | typeof ALL
 
 export default function NotificationBroadcast() {
-  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<LogPage<AdminNotificationItem>>()
   const [page, setPage] = useState(0)
@@ -313,24 +312,14 @@ export default function NotificationBroadcast() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>通知廣播</span>
-        </Space>
-        <Button type="primary" onClick={openCompose}>
-          發送通知
-        </Button>
-      </div>
+      <PageHeader
+        title="通知廣播"
+        actions={
+          <Button type="primary" onClick={openCompose}>
+            發送通知
+          </Button>
+        }
+      />
       <div style={{ padding: 24 }}>
         <Space style={{ marginBottom: 12 }} wrap>
           <span>選擇客戶：</span>

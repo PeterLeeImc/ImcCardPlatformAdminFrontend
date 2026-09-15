@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Button,
@@ -14,7 +13,7 @@ import {
   Upload,
   message,
 } from 'antd'
-import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'
+import { DeleteOutlined, DownloadOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { apiClient } from '../api/client'
@@ -22,6 +21,8 @@ import type { HolidayItem, HolidayUpsertRequest, LogPage } from '../types'
 import { formatDate } from '../utils/formatDate'
 import { formatDateTime } from '../utils/formatDateTime'
 import { compareDates, compareStrings } from '../utils/tableSort'
+import PageHeader from '../components/PageHeader'
+import ActionIcon from '../components/ActionIcon'
 
 const PAGE_SIZE = 50
 const today = new Date()
@@ -33,7 +34,6 @@ interface ImportResult {
 }
 
 export default function HolidayList() {
-  const navigate = useNavigate()
   const [year, setYear] = useState(today.getFullYear())
   // 月份留空代表查整年，比照後端HolidayController.list()「有年度、月份選填」的既定規則。
   const [month, setMonth] = useState<number>()
@@ -197,11 +197,9 @@ export default function HolidayList() {
       title: '操作',
       key: 'action',
       render: (_, record) => (
-        <Space>
-          <a onClick={() => openEdit(record)}>編輯</a>
-          <a onClick={() => handleDelete(record)} style={{ color: '#ff4d4f' }}>
-            刪除
-          </a>
+        <Space size="small">
+          <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+          <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
         </Space>
       ),
     },
@@ -209,24 +207,14 @@ export default function HolidayList() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #eee',
-        }}
-      >
-        <Space>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>假日檔維護</span>
-        </Space>
-        <Button type="primary" onClick={() => openEdit('new')}>
-          新增假日
-        </Button>
-      </div>
+      <PageHeader
+        title="假日檔維護"
+        actions={
+          <Button type="primary" onClick={() => openEdit('new')}>
+            新增假日
+          </Button>
+        }
+      />
       <div style={{ padding: 24 }}>
         <div style={{ background: '#fff', borderRadius: 8, padding: 16, marginBottom: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Excel批次匯出／匯入</div>
