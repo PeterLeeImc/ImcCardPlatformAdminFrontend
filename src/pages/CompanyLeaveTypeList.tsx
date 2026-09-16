@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, DatePicker, Form, Input, InputNumber, Layout, Modal, Select, Space, Table, message } from 'antd'
-import { EditOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { apiClient } from '../api/client'
@@ -11,8 +11,15 @@ import { formatDateTime } from '../utils/formatDateTime'
 import { compareDates, compareNumbers, compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
 import ActionIcon from '../components/ActionIcon'
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
-const CURRENT_YEAR = String(new Date().getFullYear())
+const CURRENT_YEAR_NUM = new Date().getFullYear()
+const CURRENT_YEAR = String(CURRENT_YEAR_NUM)
+const YEAR_OPTIONS = [
+  { value: String(CURRENT_YEAR_NUM), label: `今年(${CURRENT_YEAR_NUM})` },
+  { value: String(CURRENT_YEAR_NUM + 1), label: `明年(${CURRENT_YEAR_NUM + 1})` },
+]
 const DATE_FORMAT = 'YYYY/MM/DD'
 const WIRE_DATE_FORMAT = 'YYYY-MM-DD'
 
@@ -23,6 +30,8 @@ export default function CompanyLeaveTypeList() {
   const [dispatchCaseId, setDispatchCaseId] = useState<number>()
   const [year, setYear] = useState(CURRENT_YEAR)
   const [rows, setRows] = useState<WebLeaveTypeItem[]>([])
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
   const [addYearLoading, setAddYearLoading] = useState(false)
   const [syncLoading, setSyncLoading] = useState(false)
@@ -64,7 +73,10 @@ export default function CompanyLeaveTypeList() {
     setLoading(true)
     apiClient
       .get<WebLeaveTypeItem[]>('/admin/company-leave-types', { params: { dispatchCaseId, year } })
-      .then((res) => setRows(res.data))
+      .then((res) => {
+        setRows(res.data)
+        setPage(0)
+      })
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
         message.error(axiosErr.response?.data ?? '載入假別年度規則失敗')
@@ -143,7 +155,31 @@ export default function CompanyLeaveTypeList() {
     }
   }
 
+  const handleDelete = (row: WebLeaveTypeItem) => {
+    Modal.confirm({
+      title: '確定要刪除這筆假別年度規則？',
+      content: `假別：${row.leaveTypeName}，年度：${row.year}，已經有員工套用過的規則無法刪除。`,
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await apiClient.delete(`/admin/company-leave-types/${row.id}`)
+          message.success('刪除成功')
+          fetchRows()
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '刪除失敗')
+        }
+      },
+    })
+  }
+
   const columns: ColumnsType<WebLeaveTypeItem> = [
+    {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
     {
       title: '假別',
       dataIndex: 'leaveTypeName',
@@ -198,7 +234,12 @@ export default function CompanyLeaveTypeList() {
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />,
+      render: (_, record) => (
+        <Space size="small">
+          <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+          <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
+        </Space>
+      ),
     },
   ]
 
@@ -206,35 +247,59 @@ export default function CompanyLeaveTypeList() {
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
       <PageHeader title="客戶配假設定" />
       <div style={{ padding: 24 }}>
-        <Space style={{ marginBottom: 16 }} wrap>
-          <span>選擇客戶：</span>
-          <Select
-            style={{ width: 360 }}
-            placeholder="選擇客戶"
-            value={companyId}
-            onChange={setCompanyId}
-            options={companies.map((c) => ({
-              value: c.id,
-              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
-            }))}
-          />
-          <span>選擇個案：</span>
-          <Select
-            style={{ width: 200 }}
-            placeholder="選擇個案"
-            value={dispatchCaseId}
-            onChange={setDispatchCaseId}
-            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
-          />
-          <Input style={{ width: 120 }} value={year} onChange={(e) => setYear(e.target.value)} placeholder="年度" />
-          <Button loading={addYearLoading} onClick={addYear}>
-            新增假別年度
-          </Button>
-          <Button type="primary" loading={syncLoading} onClick={sync} disabled={!dispatchCaseId}>
-            同步員工假別
-          </Button>
-        </Space>
-        <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
+          <Space wrap>
+            <span>選擇客戶：</span>
+            <Select
+              style={{ width: 360 }}
+              placeholder="選擇客戶"
+              value={companyId}
+              onChange={setCompanyId}
+              options={companies.map((c) => ({
+                value: c.id,
+                label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+              }))}
+            />
+            <span>選擇個案：</span>
+            <Select
+              style={{ width: 200 }}
+              placeholder="選擇個案"
+              value={dispatchCaseId}
+              onChange={setDispatchCaseId}
+              options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
+            />
+            <Select style={{ width: 140 }} value={year} onChange={setYear} options={YEAR_OPTIONS} />
+            <Button loading={addYearLoading} onClick={addYear}>
+              新增假別年度
+            </Button>
+            <Button type="primary" loading={syncLoading} onClick={sync} disabled={!dispatchCaseId}>
+              同步員工假別
+            </Button>
+          </Space>
+          <Space>
+            <ResultCount count={rows.length} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
+        <Table
+          rowKey="id"
+          loading={loading}
+          columns={columns}
+          dataSource={rows}
+          pagination={{
+            current: page + 1,
+            pageSize,
+            total: rows.length,
+            showSizeChanger: false,
+            onChange: (nextPage) => setPage(nextPage - 1),
+          }}
+        />
       </div>
       <Modal
         title="編輯假別年度規則"

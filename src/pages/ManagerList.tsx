@@ -9,8 +9,8 @@ import { ENABLED_OPTIONS } from '../types'
 import { compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
 import ActionIcon from '../components/ActionIcon'
-
-const PAGE_SIZE = 20
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
 function enabledLabel(enabled: string): string {
   return ENABLED_OPTIONS.find((o) => o.value === enabled)?.label ?? enabled
@@ -21,12 +21,13 @@ export default function ManagerList() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<ManagerPage>()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
 
-  const fetchManagers = useCallback(async (targetPage: number) => {
+  const fetchManagers = useCallback(async (targetPage: number, size: number) => {
     setLoading(true)
     try {
       const res = await apiClient.get<ManagerPage>('/admin/managers', {
-        params: { page: targetPage, size: PAGE_SIZE },
+        params: { page: targetPage, size },
       })
       setData(res.data)
     } catch (err) {
@@ -38,8 +39,8 @@ export default function ManagerList() {
   }, [])
 
   useEffect(() => {
-    fetchManagers(page)
-  }, [page, fetchManagers])
+    fetchManagers(page, pageSize)
+  }, [page, pageSize, fetchManagers])
 
   const handleDelete = (record: ManagerListItem) => {
     Modal.confirm({
@@ -50,7 +51,7 @@ export default function ManagerList() {
         try {
           await apiClient.delete(`/admin/managers/${record.id}`)
           message.success('刪除成功')
-          fetchManagers(page)
+          fetchManagers(page, pageSize)
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
           message.error(axiosErr.response?.data ?? '刪除失敗')
@@ -82,6 +83,12 @@ export default function ManagerList() {
   }
 
   const columns: ColumnsType<ManagerListItem> = [
+    {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
     { title: '帳號', dataIndex: 'account', key: 'account', sorter: (a, b) => compareStrings(a.account, b.account) },
     {
       title: '使用者名稱',
@@ -144,6 +151,18 @@ export default function ManagerList() {
         }
       />
       <div style={{ padding: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+          <Space>
+            <ResultCount count={data?.totalElements} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
         <Table
           rowKey="id"
           loading={loading}
@@ -151,7 +170,7 @@ export default function ManagerList() {
           dataSource={data?.content ?? []}
           pagination={{
             current: page + 1,
-            pageSize: PAGE_SIZE,
+            pageSize,
             total: data?.totalElements ?? 0,
             showSizeChanger: false,
             onChange: (nextPage) => setPage(nextPage - 1),

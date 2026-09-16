@@ -5,9 +5,10 @@ import type { Dayjs } from 'dayjs'
 import { apiClient } from '../api/client'
 import type { LogPage, RwdOperationLogItem } from '../types'
 import { compareDates, compareStrings } from '../utils/tableSort'
+import { formatDateTime } from '../utils/formatDateTime'
 import PageHeader from '../components/PageHeader'
-
-const PAGE_SIZE = 20
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
 interface FilterValues {
   range?: [Dayjs, Dayjs]
@@ -20,14 +21,15 @@ export default function OperationLogList() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<LogPage<RwdOperationLogItem>>()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
 
-  const fetchLogs = useCallback(async (targetPage: number, filters: FilterValues) => {
+  const fetchLogs = useCallback(async (targetPage: number, filters: FilterValues, size: number) => {
     setLoading(true)
     try {
       const res = await apiClient.get<LogPage<RwdOperationLogItem>>('/admin/operation-logs', {
         params: {
           page: targetPage,
-          size: PAGE_SIZE,
+          size,
           from: filters.range?.[0]?.format('YYYY-MM-DD'),
           to: filters.range?.[1]?.format('YYYY-MM-DD'),
           function: filters.function || undefined,
@@ -44,16 +46,22 @@ export default function OperationLogList() {
   }, [])
 
   useEffect(() => {
-    fetchLogs(page, form.getFieldsValue())
+    fetchLogs(page, form.getFieldsValue(), pageSize)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page])
+  }, [page, pageSize])
 
   const onSearch = (values: FilterValues) => {
     setPage(0)
-    fetchLogs(0, values)
+    fetchLogs(0, values, pageSize)
   }
 
   const columns: ColumnsType<RwdOperationLogItem> = [
+    {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
     {
       title: '帳號',
       dataIndex: 'employeenum',
@@ -81,6 +89,7 @@ export default function OperationLogList() {
       dataIndex: 'operationTime',
       key: 'operationTime',
       width: 180,
+      render: formatDateTime,
       sorter: (a, b) => compareDates(a.operationTime, b.operationTime),
     },
   ]
@@ -89,33 +98,45 @@ export default function OperationLogList() {
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
       <PageHeader title="操作記錄" />
       <div style={{ padding: 24 }}>
-        <Form form={form} layout="inline" onFinish={onSearch} style={{ marginBottom: 16 }}>
-          <Form.Item name="range" label="日期區間">
-            <DatePicker.RangePicker format="YYYY/MM/DD" />
-          </Form.Item>
-          <Form.Item name="function" label="功能">
-            <Input placeholder="功能名稱" allowClear style={{ width: 160 }} />
-          </Form.Item>
-          <Form.Item name="account" label="帳號">
-            <Input placeholder="員工編號" allowClear style={{ width: 160 }} />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                查詢
-              </Button>
-              <Button
-                onClick={() => {
-                  form.resetFields()
-                  setPage(0)
-                  fetchLogs(0, {})
-                }}
-              >
-                清除
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+          <Form form={form} layout="inline" onFinish={onSearch} style={{ marginBottom: 16 }}>
+            <Form.Item name="range" label="日期區間">
+              <DatePicker.RangePicker format="YYYY/MM/DD" />
+            </Form.Item>
+            <Form.Item name="function" label="功能">
+              <Input placeholder="功能名稱" allowClear style={{ width: 160 }} />
+            </Form.Item>
+            <Form.Item name="account" label="帳號">
+              <Input placeholder="員工編號" allowClear style={{ width: 160 }} />
+            </Form.Item>
+            <Form.Item>
+              <Space>
+                <Button type="primary" htmlType="submit">
+                  查詢
+                </Button>
+                <Button
+                  onClick={() => {
+                    form.resetFields()
+                    setPage(0)
+                    fetchLogs(0, {}, pageSize)
+                  }}
+                >
+                  清除
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+          <Space>
+            <ResultCount count={data?.totalElements} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
         <Table
           rowKey={(record) => `${record.employeenum}-${record.operationTime}-${record.action}`}
           loading={loading}
@@ -123,7 +144,7 @@ export default function OperationLogList() {
           dataSource={data?.content ?? []}
           pagination={{
             current: page + 1,
-            pageSize: PAGE_SIZE,
+            pageSize,
             total: data?.totalElements ?? 0,
             showSizeChanger: false,
             onChange: (nextPage) => setPage(nextPage - 1),

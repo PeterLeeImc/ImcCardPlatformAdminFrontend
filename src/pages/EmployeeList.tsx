@@ -8,11 +8,12 @@ import type { CompanyListItem, DispatchCaseItem, EmployeeListItem, LogPage } fro
 import { JOB_STATUS_OPTIONS, SEX_OPTIONS } from '../types'
 import PageHeader from '../components/PageHeader'
 import ActionIcon from '../components/ActionIcon'
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 import { formatDate } from '../utils/formatDate'
 import { imcEmployeeDetailUrl } from '../utils/imcLinks'
 import { compareDates, compareNumbers, compareStrings } from '../utils/tableSort'
 
-const PAGE_SIZE = 20
 const SEX_LABELS: Record<string, string> = Object.fromEntries(SEX_OPTIONS.map((o) => [o.value, o.label]))
 
 export default function EmployeeList() {
@@ -27,6 +28,7 @@ export default function EmployeeList() {
   const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
   const [data, setData] = useState<LogPage<EmployeeListItem>>()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
   const [includeHidden, setIncludeHidden] = useState(false)
   const [jobStatus, setJobStatus] = useState('001')
@@ -95,7 +97,7 @@ export default function EmployeeList() {
           jobStatus: jobStatus || undefined,
           includeHidden,
           page: targetPage,
-          size: PAGE_SIZE,
+          size: pageSize,
         },
       })
       .then((res) => setData(res.data))
@@ -109,7 +111,7 @@ export default function EmployeeList() {
   useEffect(() => {
     fetchRows(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, dispatchCaseId, jobStatus, includeHidden, page])
+  }, [companyId, dispatchCaseId, jobStatus, includeHidden, page, pageSize])
 
   const changeCompany = (v: number | undefined) => {
     setSearchParams(
@@ -204,6 +206,12 @@ export default function EmployeeList() {
   }
 
   const columns: ColumnsType<EmployeeListItem> = [
+    {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
     {
       title: '員工編號',
       dataIndex: 'employeenum',
@@ -322,41 +330,55 @@ export default function EmployeeList() {
         }
       />
       <div style={{ padding: 24 }}>
-        <Space style={{ marginBottom: 16 }} wrap>
-          <span>選擇客戶：</span>
-          <Select
-            style={{ width: 360 }}
-            placeholder="選擇客戶"
-            value={companyId}
-            onChange={changeCompany}
-            options={companies.map((c) => ({
-              value: c.id,
-              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
-            }))}
-          />
-          <span>選擇個案：</span>
-          <Select
-            style={{ width: 200 }}
-            placeholder="選擇個案"
-            value={dispatchCaseId}
-            onChange={changeDispatchCase}
-            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
-          />
-          <span>在職狀態：</span>
-          <Select
-            style={{ width: 140 }}
-            allowClear
-            placeholder="全部"
-            value={jobStatus || undefined}
-            onChange={(v) => setJobStatus(v ?? '')}
-            options={JOB_STATUS_OPTIONS}
-          />
-          {!isAdvisorRole() && (
-            <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
-              顯示已隱藏項目
-            </Checkbox>
-          )}
-        </Space>
+        <div
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}
+        >
+          <Space wrap>
+            <span>選擇客戶：</span>
+            <Select
+              style={{ width: 360 }}
+              placeholder="選擇客戶"
+              value={companyId}
+              onChange={changeCompany}
+              options={companies.map((c) => ({
+                value: c.id,
+                label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+              }))}
+            />
+            <span>選擇個案：</span>
+            <Select
+              style={{ width: 200 }}
+              placeholder="選擇個案"
+              value={dispatchCaseId}
+              onChange={changeDispatchCase}
+              options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
+            />
+            <span>在職狀態：</span>
+            <Select
+              style={{ width: 140 }}
+              allowClear
+              placeholder="全部"
+              value={jobStatus || undefined}
+              onChange={(v) => setJobStatus(v ?? '')}
+              options={JOB_STATUS_OPTIONS}
+            />
+            {!isAdvisorRole() && (
+              <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
+                顯示已隱藏項目
+              </Checkbox>
+            )}
+          </Space>
+          <Space>
+            <ResultCount count={data?.totalElements} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
         <Table
           rowKey="id"
           loading={loading}
@@ -364,7 +386,7 @@ export default function EmployeeList() {
           dataSource={data?.content ?? []}
           pagination={{
             current: page + 1,
-            pageSize: PAGE_SIZE,
+            pageSize,
             total: data?.totalElements ?? 0,
             showSizeChanger: false,
             onChange: (nextPage) => setPage(nextPage - 1),

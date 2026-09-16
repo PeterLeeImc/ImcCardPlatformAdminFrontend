@@ -6,6 +6,8 @@ import type { CompanyListItem, DispatchCaseItem, EmpDayCardRow, EmployeeListItem
 import { formatDate } from '../utils/formatDate'
 import { compareDates, compareNumericLabels, compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
 const ALL_EMPLOYEES = 0
 const WHOLE_MONTH = 0
@@ -22,6 +24,8 @@ export default function EmpDayCardList() {
   const [month, setMonth] = useState(today.getMonth() + 1)
   const [day, setDay] = useState<number>(today.getDate())
   const [rows, setRows] = useState<EmpDayCardRow[]>([])
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
   const [photoModal, setPhotoModal] = useState<{ title: string; url: string }>()
 
@@ -74,7 +78,10 @@ export default function EmpDayCardList() {
       .get<EmpDayCardRow[]>('/admin/emp-day-cards', {
         params: { companyId, employeeId, year, month, day },
       })
-      .then((res) => setRows(res.data))
+      .then((res) => {
+        setRows(res.data)
+        setPage(0)
+      })
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
         message.error(axiosErr.response?.data ?? '查詢失敗')
@@ -100,6 +107,12 @@ export default function EmpDayCardList() {
   }
 
   const columns: ColumnsType<EmpDayCardRow> = [
+    {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
     {
       title: '員工編號',
       dataIndex: 'employeeNum',
@@ -232,7 +245,31 @@ export default function EmpDayCardList() {
             查詢
           </Button>
         </Space>
-        <Table rowKey={(r) => `${r.employeeId}-${r.rowDate}`} loading={loading} columns={columns} dataSource={rows} pagination={false} />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <Space>
+            <ResultCount count={rows.length} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
+        <Table
+          rowKey={(r) => `${r.employeeId}-${r.rowDate}`}
+          loading={loading}
+          columns={columns}
+          dataSource={rows}
+          pagination={{
+            current: page + 1,
+            pageSize,
+            total: rows.length,
+            showSizeChanger: false,
+            onChange: (nextPage) => setPage(nextPage - 1),
+          }}
+        />
       </div>
       <Modal title={photoModal?.title} open={!!photoModal} onCancel={closePhotoModal} footer={null}>
         {photoModal && <img src={photoModal.url} alt={photoModal.title} style={{ width: '100%' }} />}

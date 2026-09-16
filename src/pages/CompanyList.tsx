@@ -17,21 +17,22 @@ import { imcCustomerDetailUrl } from '../utils/imcLinks'
 import { compareNumbers, compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
 import ActionIcon from '../components/ActionIcon'
-
-const PAGE_SIZE = 20
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
 export default function CompanyList() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<LogPage<CompanyListItem>>()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
   const [includeHidden, setIncludeHidden] = useState(false)
 
-  const fetchCompanies = useCallback(async (targetPage: number, showHidden: boolean) => {
+  const fetchCompanies = useCallback(async (targetPage: number, showHidden: boolean, size: number) => {
     setLoading(true)
     try {
       const res = await apiClient.get<LogPage<CompanyListItem>>('/admin/companies', {
-        params: { page: targetPage, size: PAGE_SIZE, includeHidden: showHidden },
+        params: { page: targetPage, size, includeHidden: showHidden },
       })
       setData(res.data)
     } catch (err) {
@@ -43,8 +44,8 @@ export default function CompanyList() {
   }, [])
 
   useEffect(() => {
-    fetchCompanies(page, includeHidden)
-  }, [page, includeHidden, fetchCompanies])
+    fetchCompanies(page, includeHidden, pageSize)
+  }, [page, includeHidden, pageSize, fetchCompanies])
 
   const handleSetTemplate = (record: CompanyListItem) => {
     Modal.confirm({
@@ -62,7 +63,7 @@ export default function CompanyList() {
         try {
           await apiClient.post(`/admin/companies/${record.id}/set-template`)
           message.success('已設為樣板客戶')
-          fetchCompanies(page, includeHidden)
+          fetchCompanies(page, includeHidden, pageSize)
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
           message.error(axiosErr.response?.data ?? '設定失敗')
@@ -79,7 +80,7 @@ export default function CompanyList() {
         try {
           await apiClient.post(`/admin/companies/${record.id}/unset-template`)
           message.success('已取消樣板客戶標記')
-          fetchCompanies(page, includeHidden)
+          fetchCompanies(page, includeHidden, pageSize)
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
           message.error(axiosErr.response?.data ?? '設定失敗')
@@ -99,7 +100,7 @@ export default function CompanyList() {
         try {
           await apiClient.delete(`/admin/companies/${record.id}`)
           message.success('刪除成功')
-          fetchCompanies(page, includeHidden)
+          fetchCompanies(page, includeHidden, pageSize)
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
           message.error(axiosErr.response?.data ?? '刪除失敗')
@@ -116,7 +117,7 @@ export default function CompanyList() {
         try {
           await apiClient.post(`/admin/companies/${record.id}/restore`)
           message.success('已還原')
-          fetchCompanies(page, includeHidden)
+          fetchCompanies(page, includeHidden, pageSize)
         } catch (err) {
           const axiosErr = err as { response?: { data?: string } }
           message.error(axiosErr.response?.data ?? '還原失敗')
@@ -126,6 +127,12 @@ export default function CompanyList() {
   }
 
   const columns: ColumnsType<CompanyListItem> = [
+    {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
     {
       title: '客戶編號',
       dataIndex: 'companyNum',
@@ -236,18 +243,31 @@ export default function CompanyList() {
         }
       />
       <div style={{ padding: 24 }}>
-        {!isAdvisorRole() && (
-          <Checkbox
-            checked={includeHidden}
-            onChange={(e) => {
-              setIncludeHidden(e.target.checked)
-              setPage(0)
-            }}
-            style={{ marginBottom: 16 }}
-          >
-            顯示已隱藏項目
-          </Checkbox>
-        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
+          {!isAdvisorRole() ? (
+            <Checkbox
+              checked={includeHidden}
+              onChange={(e) => {
+                setIncludeHidden(e.target.checked)
+                setPage(0)
+              }}
+            >
+              顯示已隱藏項目
+            </Checkbox>
+          ) : (
+            <span />
+          )}
+          <Space>
+            <ResultCount count={data?.totalElements} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
         <Table
           rowKey="id"
           loading={loading}
@@ -255,7 +275,7 @@ export default function CompanyList() {
           dataSource={data?.content ?? []}
           pagination={{
             current: page + 1,
-            pageSize: PAGE_SIZE,
+            pageSize,
             total: data?.totalElements ?? 0,
             showSizeChanger: false,
             onChange: (nextPage) => setPage(nextPage - 1),

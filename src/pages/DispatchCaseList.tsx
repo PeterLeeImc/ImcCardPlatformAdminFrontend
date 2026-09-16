@@ -10,6 +10,8 @@ import { imcDispatchCaseDetailUrl } from '../utils/imcLinks'
 import { compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
 import ActionIcon from '../components/ActionIcon'
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
 export default function DispatchCaseList() {
   const navigate = useNavigate()
@@ -17,6 +19,8 @@ export default function DispatchCaseList() {
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [companyId, setCompanyId] = useState<number>()
   const [rows, setRows] = useState<DispatchCaseItem[]>([])
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
   const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<DispatchCaseItem | 'new'>()
@@ -45,7 +49,10 @@ export default function DispatchCaseList() {
     setLoading(true)
     apiClient
       .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`, { params: { includeHidden } })
-      .then((res) => setRows(res.data))
+      .then((res) => {
+        setRows(res.data)
+        setPage(0)
+      })
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
         message.error(axiosErr.response?.data ?? '載入個案清單失敗')
@@ -143,6 +150,12 @@ export default function DispatchCaseList() {
 
   const columns: ColumnsType<DispatchCaseItem> = [
     {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
+    {
       title: '個案編號',
       dataIndex: 'caseCode',
       key: 'caseCode',
@@ -228,25 +241,49 @@ export default function DispatchCaseList() {
         }
       />
       <div style={{ padding: 24 }}>
-        <Space style={{ marginBottom: 16 }}>
-          <span>選擇客戶：</span>
-          <Select
-            style={{ width: 360 }}
-            placeholder="選擇客戶"
-            value={companyId}
-            onChange={setCompanyId}
-            options={companies.map((c) => ({
-              value: c.id,
-              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
-            }))}
-          />
-          {!isAdvisorRole() && (
-            <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
-              顯示已隱藏項目
-            </Checkbox>
-          )}
-        </Space>
-        <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
+          <Space>
+            <span>選擇客戶：</span>
+            <Select
+              style={{ width: 360 }}
+              placeholder="選擇客戶"
+              value={companyId}
+              onChange={setCompanyId}
+              options={companies.map((c) => ({
+                value: c.id,
+                label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+              }))}
+            />
+            {!isAdvisorRole() && (
+              <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
+                顯示已隱藏項目
+              </Checkbox>
+            )}
+          </Space>
+          <Space>
+            <ResultCount count={rows.length} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
+        <Table
+          rowKey="id"
+          loading={loading}
+          columns={columns}
+          dataSource={rows}
+          pagination={{
+            current: page + 1,
+            pageSize,
+            total: rows.length,
+            showSizeChanger: false,
+            onChange: (nextPage) => setPage(nextPage - 1),
+          }}
+        />
       </div>
       <Modal
         title={editing === 'new' ? '新增個案' : '編輯個案'}

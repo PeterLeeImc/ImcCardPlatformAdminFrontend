@@ -13,8 +13,9 @@ import type {
 } from '../types'
 import { compareDates, compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
-const PAGE_SIZE = 20
 const ALL = 'ALL' as const
 type Choice = number | typeof ALL
 
@@ -22,6 +23,7 @@ export default function NotificationBroadcast() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<LogPage<AdminNotificationItem>>()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
 
   // 「已發送」清單的篩選條件：客戶必選(當作查詢範圍)，個案/員工/發送人/主旨/內容/發送時間/
   // 已讀時間都是選填的進一步篩選。
@@ -102,7 +104,7 @@ export default function NotificationBroadcast() {
             readFrom: f.readRange?.[0]?.format('YYYY-MM-DD'),
             readTo: f.readRange?.[1]?.format('YYYY-MM-DD'),
             page: targetPage,
-            size: PAGE_SIZE,
+            size: pageSize,
           },
         })
         setData(res.data)
@@ -122,13 +124,14 @@ export default function NotificationBroadcast() {
       filterContent,
       filterSentRange,
       filterReadRange,
+      pageSize,
     ],
   )
 
   useEffect(() => {
     fetchNotifications(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, listCompanyId])
+  }, [page, listCompanyId, pageSize])
 
   // 選擇客戶改變時，重置底下的個案/員工篩選，並重新載入這家客戶的派遣個案清單。
   useEffect(() => {
@@ -255,6 +258,12 @@ export default function NotificationBroadcast() {
   }
 
   const columns: ColumnsType<AdminNotificationItem> = [
+    {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
     {
       title: '客戶',
       dataIndex: 'companyName',
@@ -394,6 +403,18 @@ export default function NotificationBroadcast() {
           </Button>
           <Button onClick={clearFilters}>清除</Button>
         </Space>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <Space>
+            <ResultCount count={data?.totalElements} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
         <Table
           rowKey="id"
           loading={loading}
@@ -401,7 +422,7 @@ export default function NotificationBroadcast() {
           dataSource={data?.content ?? []}
           pagination={{
             current: page + 1,
-            pageSize: PAGE_SIZE,
+            pageSize,
             total: data?.totalElements ?? 0,
             showSizeChanger: false,
             onChange: (nextPage) => setPage(nextPage - 1),

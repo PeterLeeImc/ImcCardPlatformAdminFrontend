@@ -14,6 +14,8 @@ import { formatDateTime } from '../utils/formatDateTime'
 import { compareNumbers, compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
 import ActionIcon from '../components/ActionIcon'
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
 const DEFAULT_CENTER: [number, number] = [23.9739, 120.9797] // 台灣中心點，還沒有座標時的預設地圖中心
 
@@ -86,6 +88,8 @@ export default function ComTimeScheduleList() {
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
   const [rows, setRows] = useState<ComTimeScheduleItem[]>([])
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
   const [copyingFromTemplate, setCopyingFromTemplate] = useState(false)
   const [editing, setEditing] = useState<ComTimeScheduleItem | 'new'>()
@@ -159,7 +163,10 @@ export default function ComTimeScheduleList() {
     setLoading(true)
     apiClient
       .get<ComTimeScheduleItem[]>(basePath)
-      .then((res) => setRows(res.data))
+      .then((res) => {
+        setRows(res.data)
+        setPage(0)
+      })
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
         message.error(axiosErr.response?.data ?? '載入班表清單失敗')
@@ -397,6 +404,12 @@ export default function ComTimeScheduleList() {
 
   const columns: ColumnsType<ComTimeScheduleItem> = [
     {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
+    {
       title: '班別編號',
       dataIndex: 'workType',
       key: 'workType',
@@ -479,32 +492,56 @@ export default function ComTimeScheduleList() {
         }
       />
       <div style={{ padding: 24 }}>
-        <Space style={{ marginBottom: 16 }} wrap>
-          <span>選擇客戶：</span>
-          <Select
-            style={{ width: 360 }}
-            placeholder="選擇客戶"
-            value={companyId}
-            onChange={changeCompany}
-            options={companies.map((c) => ({
-              value: c.id,
-              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
-            }))}
-          />
-          <span>選擇個案：</span>
-          <Select
-            style={{ width: 200 }}
-            placeholder={companyId ? '選擇個案' : '請先選擇客戶'}
-            disabled={!companyId}
-            value={dispatchCaseId}
-            onChange={changeDispatchCase}
-            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
-          />
-          <Button onClick={copyFromTemplate} loading={copyingFromTemplate} disabled={!canCopyFromTemplate}>
-            複製樣板客戶個案班表
-          </Button>
-        </Space>
-        <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
+          <Space wrap>
+            <span>選擇客戶：</span>
+            <Select
+              style={{ width: 360 }}
+              placeholder="選擇客戶"
+              value={companyId}
+              onChange={changeCompany}
+              options={companies.map((c) => ({
+                value: c.id,
+                label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+              }))}
+            />
+            <span>選擇個案：</span>
+            <Select
+              style={{ width: 200 }}
+              placeholder={companyId ? '選擇個案' : '請先選擇客戶'}
+              disabled={!companyId}
+              value={dispatchCaseId}
+              onChange={changeDispatchCase}
+              options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
+            />
+            <Button onClick={copyFromTemplate} loading={copyingFromTemplate} disabled={!canCopyFromTemplate}>
+              複製樣板客戶個案班表
+            </Button>
+          </Space>
+          <Space>
+            <ResultCount count={rows.length} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
+        <Table
+          rowKey="id"
+          loading={loading}
+          columns={columns}
+          dataSource={rows}
+          pagination={{
+            current: page + 1,
+            pageSize,
+            total: rows.length,
+            showSizeChanger: false,
+            onChange: (nextPage) => setPage(nextPage - 1),
+          }}
+        />
       </div>
       <Modal
         title={editing === 'new' ? '新增班表' : '編輯班表'}

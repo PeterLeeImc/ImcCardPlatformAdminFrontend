@@ -23,8 +23,9 @@ import { formatDateTime } from '../utils/formatDateTime'
 import { compareDates, compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
 import ActionIcon from '../components/ActionIcon'
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
-const PAGE_SIZE = 50
 const today = new Date()
 const DATE_FORMAT = 'YYYY/MM/DD'
 
@@ -39,6 +40,7 @@ export default function HolidayList() {
   const [month, setMonth] = useState<number>()
   const [data, setData] = useState<LogPage<HolidayItem>>()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<HolidayItem | 'new'>()
   const [saving, setSaving] = useState(false)
@@ -52,7 +54,7 @@ export default function HolidayList() {
   const fetchRows = (targetPage: number) => {
     setLoading(true)
     apiClient
-      .get<LogPage<HolidayItem>>('/admin/holidays', { params: { year, month, page: targetPage, size: PAGE_SIZE } })
+      .get<LogPage<HolidayItem>>('/admin/holidays', { params: { year, month, page: targetPage, size: pageSize } })
       .then((res) => setData(res.data))
       .catch(() => message.error('載入假日檔失敗'))
       .finally(() => setLoading(false))
@@ -61,7 +63,7 @@ export default function HolidayList() {
   useEffect(() => {
     fetchRows(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, page])
+  }, [year, month, page, pageSize])
 
   const openEdit = (row: HolidayItem | 'new') => {
     setEditing(row)
@@ -160,38 +162,18 @@ export default function HolidayList() {
   }
 
   const columns: ColumnsType<HolidayItem> = [
+    {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
     { title: '日期', dataIndex: 'day', key: 'day', render: formatDate, sorter: (a, b) => compareDates(a.day, b.day) },
     {
       title: '假日說明',
       dataIndex: 'explain',
       key: 'explain',
       sorter: (a, b) => compareStrings(a.explain, b.explain),
-    },
-    {
-      title: '建立時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: formatDateTime,
-      sorter: (a, b) => compareDates(a.createdAt, b.createdAt),
-    },
-    {
-      title: '建立者',
-      dataIndex: 'createdBy',
-      key: 'createdBy',
-      sorter: (a, b) => compareStrings(a.createdBy, b.createdBy),
-    },
-    {
-      title: '異動時間',
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      render: formatDateTime,
-      sorter: (a, b) => compareDates(a.updatedAt, b.updatedAt),
-    },
-    {
-      title: '異動者',
-      dataIndex: 'updatedBy',
-      key: 'updatedBy',
-      sorter: (a, b) => compareStrings(a.updatedBy, b.updatedBy),
     },
     {
       title: '操作',
@@ -264,29 +246,41 @@ export default function HolidayList() {
           )}
         </div>
 
-        <Space style={{ marginBottom: 16 }}>
-          <InputNumber
-            value={year}
-            onChange={(v) => {
-              setYear(v ?? today.getFullYear())
-              setPage(0)
-            }}
-            style={{ width: 100 }}
-            addonAfter="年"
-          />
-          <InputNumber
-            value={month}
-            min={1}
-            max={12}
-            onChange={(v) => {
-              setMonth(v ?? undefined)
-              setPage(0)
-            }}
-            style={{ width: 90 }}
-            addonAfter="月"
-            placeholder="全年"
-          />
-        </Space>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
+          <Space>
+            <InputNumber
+              value={year}
+              onChange={(v) => {
+                setYear(v ?? today.getFullYear())
+                setPage(0)
+              }}
+              style={{ width: 100 }}
+              addonAfter="年"
+            />
+            <InputNumber
+              value={month}
+              min={1}
+              max={12}
+              onChange={(v) => {
+                setMonth(v ?? undefined)
+                setPage(0)
+              }}
+              style={{ width: 90 }}
+              addonAfter="月"
+              placeholder="全年"
+            />
+          </Space>
+          <Space>
+            <ResultCount count={data?.totalElements} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
         <Table
           rowKey="id"
           loading={loading}
@@ -294,7 +288,7 @@ export default function HolidayList() {
           dataSource={data?.content ?? []}
           pagination={{
             current: page + 1,
-            pageSize: PAGE_SIZE,
+            pageSize,
             total: data?.totalElements ?? 0,
             showSizeChanger: false,
             onChange: (nextPage) => setPage(nextPage - 1),

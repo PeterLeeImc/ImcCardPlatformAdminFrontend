@@ -8,6 +8,8 @@ import { formatDateTime } from '../utils/formatDateTime'
 import { compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
 import ActionIcon from '../components/ActionIcon'
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
 export default function WorkOvertimeList() {
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
@@ -15,6 +17,8 @@ export default function WorkOvertimeList() {
   const [dispatchCases, setDispatchCases] = useState<DispatchCaseItem[]>([])
   const [dispatchCaseId, setDispatchCaseId] = useState<number>()
   const [rows, setRows] = useState<WorkOvertimeItem[]>([])
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<WorkOvertimeItem | 'new'>()
   const [saving, setSaving] = useState(false)
@@ -56,7 +60,10 @@ export default function WorkOvertimeList() {
     setLoading(true)
     apiClient
       .get<WorkOvertimeItem[]>('/admin/work-overtimes', { params: { dispatchCaseId, includeHidden } })
-      .then((res) => setRows(res.data))
+      .then((res) => {
+        setRows(res.data)
+        setPage(0)
+      })
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
         message.error(axiosErr.response?.data ?? '載入加班別清單失敗')
@@ -163,6 +170,12 @@ export default function WorkOvertimeList() {
 
   const columns: ColumnsType<WorkOvertimeItem> = [
     {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
+    {
       title: '加班別名稱',
       dataIndex: 'chName',
       key: 'chName',
@@ -214,36 +227,60 @@ export default function WorkOvertimeList() {
         }
       />
       <div style={{ padding: 24 }}>
-        <Space style={{ marginBottom: 16 }} wrap>
-          <span>選擇客戶：</span>
-          <Select
-            style={{ width: 360 }}
-            placeholder="選擇客戶"
-            value={companyId}
-            onChange={setCompanyId}
-            options={companies.map((c) => ({
-              value: c.id,
-              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
-            }))}
-          />
-          <span>選擇個案：</span>
-          <Select
-            style={{ width: 200 }}
-            placeholder="選擇個案"
-            value={dispatchCaseId}
-            onChange={setDispatchCaseId}
-            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
-          />
-          <Button onClick={copyFromTemplate} loading={copying} disabled={!canCopyFromTemplate}>
-            複製樣板客戶加班別
-          </Button>
-          {!isAdvisorRole() && (
-            <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
-              顯示已隱藏項目
-            </Checkbox>
-          )}
-        </Space>
-        <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
+          <Space wrap>
+            <span>選擇客戶：</span>
+            <Select
+              style={{ width: 360 }}
+              placeholder="選擇客戶"
+              value={companyId}
+              onChange={setCompanyId}
+              options={companies.map((c) => ({
+                value: c.id,
+                label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+              }))}
+            />
+            <span>選擇個案：</span>
+            <Select
+              style={{ width: 200 }}
+              placeholder="選擇個案"
+              value={dispatchCaseId}
+              onChange={setDispatchCaseId}
+              options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
+            />
+            <Button onClick={copyFromTemplate} loading={copying} disabled={!canCopyFromTemplate}>
+              複製樣板客戶加班別
+            </Button>
+            {!isAdvisorRole() && (
+              <Checkbox checked={includeHidden} onChange={(e) => setIncludeHidden(e.target.checked)}>
+                顯示已隱藏項目
+              </Checkbox>
+            )}
+          </Space>
+          <Space>
+            <ResultCount count={rows.length} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
+        <Table
+          rowKey="id"
+          loading={loading}
+          columns={columns}
+          dataSource={rows}
+          pagination={{
+            current: page + 1,
+            pageSize,
+            total: rows.length,
+            showSizeChanger: false,
+            onChange: (nextPage) => setPage(nextPage - 1),
+          }}
+        />
       </div>
       <Modal
         title={editing === 'new' ? '新增加班別' : '編輯加班別'}

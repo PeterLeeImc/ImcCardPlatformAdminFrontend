@@ -6,6 +6,8 @@ import type { AttendanceReportRow, CompanyListItem, DispatchCaseItem, EmployeeLi
 import { formatDate } from '../utils/formatDate'
 import { compareDates, compareNumericLabels, compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
 const ALL_EMPLOYEES = 0
 const today = new Date()
@@ -22,6 +24,8 @@ export default function AttendanceDetailReport() {
   const [rows, setRows] = useState<AttendanceReportRow[]>([])
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
 
   useEffect(() => {
     apiClient
@@ -74,7 +78,10 @@ export default function AttendanceDetailReport() {
           month,
         },
       })
-      .then((res) => setRows(res.data))
+      .then((res) => {
+        setRows(res.data)
+        setPage(0)
+      })
       .catch((err) => {
         const axiosErr = err as { response?: { data?: string } }
         message.error(axiosErr.response?.data ?? '查詢失敗')
@@ -115,6 +122,12 @@ export default function AttendanceDetailReport() {
   }
 
   const columns: ColumnsType<AttendanceReportRow> = [
+    {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
     {
       title: '員工編號',
       dataIndex: 'employeeNum',
@@ -249,12 +262,30 @@ export default function AttendanceDetailReport() {
             查詢
           </Button>
         </Space>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <Space>
+            <ResultCount count={rows.length} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
         <Table
           rowKey={(r) => `${r.employeeNum}-${r.date}`}
           loading={loading}
           columns={columns}
           dataSource={rows}
-          pagination={{ pageSize: 31 }}
+          pagination={{
+            current: page + 1,
+            pageSize,
+            total: rows.length,
+            showSizeChanger: false,
+            onChange: (nextPage) => setPage(nextPage - 1),
+          }}
           scroll={{ x: 'max-content' }}
         />
       </div>

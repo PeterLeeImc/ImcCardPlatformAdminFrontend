@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { DatePicker, Form, Input, InputNumber, Layout, Modal, Select, Space, Table, message } from 'antd'
-import { EditOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { apiClient } from '../api/client'
@@ -17,9 +17,10 @@ import { formatDateTime } from '../utils/formatDateTime'
 import { compareDates, compareNumbers, compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
 import ActionIcon from '../components/ActionIcon'
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
-const PAGE_SIZE = 20
 const DATE_FORMAT = 'YYYY/MM/DD'
 const WIRE_DATE_FORMAT = 'YYYY-MM-DD'
 
@@ -33,6 +34,7 @@ export default function EmployeeLeaveTypeList() {
   const [leaveTypeOptions, setLeaveTypeOptions] = useState<WebLeaveTypeItem[]>([])
   const [data, setData] = useState<LogPage<WebEmpLeaveTypeItem>>()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<WebEmpLeaveTypeItem>()
   const [saving, setSaving] = useState(false)
@@ -80,7 +82,7 @@ export default function EmployeeLeaveTypeList() {
     setLoading(true)
     apiClient
       .get<LogPage<WebEmpLeaveTypeItem>>('/admin/employee-leave-types', {
-        params: { companyId, year, leaveTypeId: leaveTypeId || undefined, page: targetPage, size: PAGE_SIZE },
+        params: { companyId, year, leaveTypeId: leaveTypeId || undefined, page: targetPage, size: pageSize },
       })
       .then((res) => setData(res.data))
       .catch((err) => {
@@ -93,7 +95,7 @@ export default function EmployeeLeaveTypeList() {
   useEffect(() => {
     fetchRows(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, year, leaveTypeId, page])
+  }, [companyId, year, leaveTypeId, page, pageSize])
 
   const openEdit = (row: WebEmpLeaveTypeItem) => {
     setEditing(row)
@@ -130,7 +132,31 @@ export default function EmployeeLeaveTypeList() {
     }
   }
 
+  const handleDelete = (row: WebEmpLeaveTypeItem) => {
+    Modal.confirm({
+      title: '確定要刪除這筆員工假別額度？',
+      content: `員工：${row.employeeChname}，假別：${row.leaveTypeName}`,
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await apiClient.delete(`/admin/employee-leave-types/${row.id}`)
+          message.success('刪除成功')
+          fetchRows(page)
+        } catch (err) {
+          const axiosErr = err as { response?: { data?: string } }
+          message.error(axiosErr.response?.data ?? '刪除失敗')
+        }
+      },
+    })
+  }
+
   const columns: ColumnsType<WebEmpLeaveTypeItem> = [
+    {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
     {
       title: '員工編號',
       dataIndex: 'employeeNum',
@@ -192,7 +218,12 @@ export default function EmployeeLeaveTypeList() {
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />,
+      render: (_, record) => (
+        <Space size="small">
+          <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+          <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
+        </Space>
+      ),
     },
   ]
 
@@ -200,50 +231,62 @@ export default function EmployeeLeaveTypeList() {
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
       <PageHeader title="員工配假設定" />
       <div style={{ padding: 24 }}>
-        <Space style={{ marginBottom: 16 }} wrap>
-          <span>選擇客戶：</span>
-          <Select
-            style={{ width: 360 }}
-            placeholder="選擇客戶"
-            value={companyId}
-            onChange={(v) => {
-              setCompanyId(v)
-              setPage(0)
-            }}
-            options={companies.map((c) => ({
-              value: c.id,
-              label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
-            }))}
-          />
-          <span>選擇個案(篩選假別選項)：</span>
-          <Select
-            style={{ width: 200 }}
-            placeholder="選擇個案(篩選假別選項)"
-            value={dispatchCaseId}
-            onChange={setDispatchCaseId}
-            options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
-          />
-          <Input
-            style={{ width: 120 }}
-            value={year}
-            onChange={(e) => {
-              setYear(e.target.value)
-              setPage(0)
-            }}
-            placeholder="年度"
-          />
-          <Select
-            style={{ width: 200 }}
-            placeholder="假別(全部)"
-            allowClear
-            value={leaveTypeId}
-            onChange={(v) => {
-              setLeaveTypeId(v)
-              setPage(0)
-            }}
-            options={leaveTypeOptions.map((l) => ({ value: l.leaveTypeId, label: l.leaveTypeName }))}
-          />
-        </Space>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
+          <Space wrap>
+            <span>選擇客戶：</span>
+            <Select
+              style={{ width: 360 }}
+              placeholder="選擇客戶"
+              value={companyId}
+              onChange={(v) => {
+                setCompanyId(v)
+                setPage(0)
+              }}
+              options={companies.map((c) => ({
+                value: c.id,
+                label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
+              }))}
+            />
+            <span>選擇個案(篩選假別選項)：</span>
+            <Select
+              style={{ width: 200 }}
+              placeholder="選擇個案(篩選假別選項)"
+              value={dispatchCaseId}
+              onChange={setDispatchCaseId}
+              options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
+            />
+            <Input
+              style={{ width: 120 }}
+              value={year}
+              onChange={(e) => {
+                setYear(e.target.value)
+                setPage(0)
+              }}
+              placeholder="年度"
+            />
+            <Select
+              style={{ width: 200 }}
+              placeholder="假別(全部)"
+              allowClear
+              value={leaveTypeId}
+              onChange={(v) => {
+                setLeaveTypeId(v)
+                setPage(0)
+              }}
+              options={leaveTypeOptions.map((l) => ({ value: l.leaveTypeId, label: l.leaveTypeName }))}
+            />
+          </Space>
+          <Space>
+            <ResultCount count={data?.totalElements} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
         <Table
           rowKey="id"
           loading={loading}
@@ -251,7 +294,7 @@ export default function EmployeeLeaveTypeList() {
           dataSource={data?.content ?? []}
           pagination={{
             current: page + 1,
-            pageSize: PAGE_SIZE,
+            pageSize,
             total: data?.totalElements ?? 0,
             showSizeChanger: false,
             onChange: (nextPage) => setPage(nextPage - 1),

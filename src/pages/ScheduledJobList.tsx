@@ -8,6 +8,8 @@ import type { ScheduledJobItem, ScheduledJobUpdateRequest } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
 import PageHeader from '../components/PageHeader'
 import ActionIcon from '../components/ActionIcon'
+import ResultCount from '../components/ResultCount'
+import PageSizeSelect from '../components/PageSizeSelect'
 
 const TIME_FORMAT = 'HH:mm'
 
@@ -35,6 +37,8 @@ export default function ScheduledJobList() {
   const [editEnabled, setEditEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
   const [running, setRunning] = useState<string>()
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
 
   const fetchRows = () => {
     setLoading(true)
@@ -106,6 +110,12 @@ export default function ScheduledJobList() {
   }
 
   const columns: ColumnsType<ScheduledJobItem> = [
+    {
+      title: '序號',
+      key: 'seq',
+      width: 60,
+      render: (_, __, index) => page * pageSize + index + 1,
+    },
     { title: '排程名稱', dataIndex: 'displayName', key: 'displayName', width: 200 },
     { title: '說明', dataIndex: 'description', key: 'description' },
     {
@@ -168,7 +178,31 @@ export default function ScheduledJobList() {
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
       <PageHeader title="排程管理" />
       <div style={{ padding: 24 }}>
-        <Table rowKey="jobKey" loading={loading} columns={columns} dataSource={rows} pagination={false} />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+          <Space>
+            <ResultCount count={rows.length} />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(v)
+                setPage(0)
+              }}
+            />
+          </Space>
+        </div>
+        <Table
+          rowKey="jobKey"
+          loading={loading}
+          columns={columns}
+          dataSource={rows}
+          pagination={{
+            current: page + 1,
+            pageSize,
+            total: rows.length,
+            showSizeChanger: false,
+            onChange: (nextPage) => setPage(nextPage - 1),
+          }}
+        />
       </div>
       <Modal
         title={`設定執行時間${editing ? ` - ${editing.displayName}` : ''}`}
