@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Form, Input, message, Modal } from 'antd'
+import { Button, Form, Input, message } from 'antd'
 import { apiClient } from '../api/client'
 import { loadAdminConfig } from '../api/config'
 
@@ -69,21 +69,14 @@ export default function Login() {
     } catch (err) {
       const axiosErr = err as { response?: { status: number; data?: string } }
       if (axiosErr.response?.status === 409 && axiosErr.response.data === 'DUPLICATE_SESSION') {
-        Modal.confirm({
-          content: '此帳號已在其他地方登入中，是否要將舊的登入登出並繼續登入？',
-          onOk: async () => {
-            setLoading(true)
-            try {
-              await doLogin(values, true)
-            } catch (err2) {
-              const axiosErr2 = err2 as { response?: { data?: string } }
-              message.error(axiosErr2.response?.data ?? '登入失敗')
-              refreshCaptcha()
-            } finally {
-              setLoading(false)
-            }
-          },
-        })
+        // 不再跳確認框，直接把舊的登入登出並繼續這次登入，比照使用者要求的行為。
+        try {
+          await doLogin(values, true)
+        } catch (err2) {
+          const axiosErr2 = err2 as { response?: { data?: string } }
+          message.error(axiosErr2.response?.data ?? '登入失敗')
+          refreshCaptcha()
+        }
         return
       }
       message.error(axiosErr.response?.data ?? '登入失敗')

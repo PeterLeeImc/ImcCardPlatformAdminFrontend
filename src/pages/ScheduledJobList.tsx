@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Layout, Modal, Space, Switch, Table, Tag, TimePicker, message } from 'antd'
+import { InputNumber, Layout, Modal, Radio, Space, Switch, Table, Tag, TimePicker, message } from 'antd'
 import { ClockCircleOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
@@ -13,20 +13,24 @@ import PageSizeSelect from '../components/PageSizeSelect'
 
 const TIME_FORMAT = 'HH:mm'
 
-/** 這個系統的排程都是「每天固定某個時間點觸發一次」，cron固定是"0 分 時 * * *"這個形狀，
- * 這裡只需要把時間選擇器編輯的HH:mm跟這個形狀互相轉換，不用讓管理端使用者直接寫cron語法。 */
-function cronToTime(cron: string): dayjs.Dayjs | null {
+/**
+ * 這個系統的排程大多是「每天固定某個時間點觸發一次」，cron是"0 分 時 * * *"這個形狀；但生理假
+ * 這種按月發放的排程是"0 分 時 幾號 * *"(日欄位不是*，而是1~31的固定數字)，這裡把「每天」跟
+ * 「每月第幾天」兩種形狀都解析出來，讓編輯畫面可以正確顯示、儲存時也不會把月排程誤存成天天觸發。
+ */
+function parseCron(cron: string): { time: dayjs.Dayjs | null; dayOfMonth: number | null } {
   const parts = cron.trim().split(/\s+/)
-  if (parts.length !== 6) return null
-  const [, minute, hour] = parts
+  if (parts.length !== 6) return { time: null, dayOfMonth: null }
+  const [, minute, hour, dayOfMonthField] = parts
   const h = Number(hour)
   const m = Number(minute)
-  if (!Number.isInteger(h) || !Number.isInteger(m)) return null
-  return dayjs().hour(h).minute(m).second(0)
+  if (!Number.isInteger(h) || !Number.isInteger(m)) return { time: null, dayOfMonth: null }
+  const dayOfMonth = dayOfMonthField === '*' ? null : Number(dayOfMonthField)
+  return { time: dayjs().hour(h).minute(m).second(0), dayOfMonth: Number.isInteger(dayOfMonth) ? dayOfMonth : null }
 }
 
-function timeToCron(time: dayjs.Dayjs): string {
-  return `0 ${time.minute()} ${time.hour()} * * *`
+function buildCron(time: dayjs.Dayjs, dayOfMonth: number | null): string {
+  return `0 ${time.minute()} ${time.hour()} ${dayOfMonth ?? '*'} * *`
 }
 
 export default function ScheduledJobList() {
@@ -34,6 +38,8 @@ export default function ScheduledJobList() {
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<ScheduledJobItem>()
   const [editTime, setEditTime] = useState<dayjs.Dayjs | null>(null)
+  const [editFrequency, setEditFrequency] = useState<'daily' | 'monthly'>('daily')
+  const [editDayOfMonth, setEditDayOfMonth] = useState(1)
   const [editEnabled, setEditEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
   const [running, setRunning] = useState<string>()
@@ -58,7 +64,10 @@ export default function ScheduledJobList() {
 
   const openEdit = (row: ScheduledJobItem) => {
     setEditing(row)
-    setEditTime(cronToTime(row.cronExpression))
+    const { time, dayOfMonth } = parseCron(row.cronExpression)
+    setEditTime(time)
+    setEditFrequency(dayOfMonth == null ? 'daily' : 'monthly')
+    setEditDayOfMonth(dayOfMonth ?? 1)
     setEditEnabled(row.enabled)
   }
 
@@ -69,7 +78,10 @@ export default function ScheduledJobList() {
     }
     setSaving(true)
     try {
-      const body: ScheduledJobUpdateRequest = { cronExpression: timeToCron(editTime), enabled: editEnabled }
+      const body: ScheduledJobUpdateRequest = {
+        cronExpression: buildCron(editTime, editFrequency === 'monthly' ? editDayOfMonth : null),
+        enabled: editEnabled,
+      }
       const res = await apiClient.put<ScheduledJobItem>(`/admin/scheduled-jobs/${editing.jobKey}`, body)
       setRows((prev) => prev.map((r) => (r.jobKey === res.data.jobKey ? res.data : r)))
       message.success('已更新排程設定')
@@ -121,10 +133,11 @@ export default function ScheduledJobList() {
     {
       title: '執行時間',
       key: 'time',
-      width: 100,
+      width: 140,
       render: (_, record) => {
-        const time = cronToTime(record.cronExpression)
-        return time ? time.format(TIME_FORMAT) : record.cronExpression
+        const { time, dayOfMonth } = parseCron(record.cronExpression)
+        if (!time) return record.cronExpression
+        return dayOfMonth == null ? `每天 ${time.format(TIME_FORMAT)}` : `每月${dayOfMonth}號 ${time.format(TIME_FORMAT)}`
       },
     },
     {
@@ -214,7 +227,31 @@ export default function ScheduledJobList() {
       >
         <Space direction="vertical" size={16} style={{ width: '100%' }}>
           <div>
-            <div style={{ marginBottom: 8 }}>每天執行時間</div>
+            <div style={{ marginBottom: 8 }}>觸發頻率</div>
+            <Radio.Group
+              value={editFrequency}
+              onChange={(e) => setEditFrequency(e.target.value)}
+              options={[
+                { label: '每天', value: 'daily' },
+                { label: '每月固定一天', value: 'monthly' },
+              ]}
+            />
+          </div>
+          {editFrequency === 'monthly' && (
+            <div>
+              <div style={{ marginBottom: 8 }}>每月第幾天執行</div>
+              <InputNumber
+                value={editDayOfMonth}
+                onChange={(v) => setEditDayOfMonth(v ?? 1)}
+                min={1}
+                max={31}
+                addonAfter="號"
+                style={{ width: 140 }}
+              />
+            </div>
+          )}
+          <div>
+            <div style={{ marginBottom: 8 }}>執行時間</div>
             <TimePicker value={editTime} onChange={setEditTime} format={TIME_FORMAT} minuteStep={5} style={{ width: '100%' }} />
           </div>
           <div>
