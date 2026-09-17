@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Form, Input, message } from 'antd'
-import { apiClient } from '../api/client'
+import { apiClient, setOperatingDispatchCase } from '../api/client'
 import { loadAdminConfig } from '../api/config'
 
 interface LoginFormValues {
@@ -12,10 +12,14 @@ interface LoginFormValues {
 
 interface LoginResponse {
   token: string
+  employeenum: string
   chname: string
   mustChangePassword: boolean
   operatingCompanyId: number | null
   operatingCompanyName: string | null
+  operatingDispatchCaseId: number | null
+  operatingDispatchCaseCompanyId: number | null
+  operatingDispatchCaseLabel: string | null
   role: string | null
 }
 
@@ -44,6 +48,7 @@ export default function Login() {
   const doLogin = async (values: LoginFormValues, confirmed: boolean) => {
     const res = await apiClient.post<LoginResponse>('/auth/login', { ...values, captchaToken, confirmed })
     localStorage.setItem('platformToken', res.data.token)
+    localStorage.setItem('platformAccount', res.data.employeenum)
     localStorage.setItem('platformChname', res.data.chname)
     localStorage.setItem('platformMustChangePassword', String(res.data.mustChangePassword))
     if (res.data.role) {
@@ -58,6 +63,11 @@ export default function Login() {
       localStorage.removeItem('platformOperatingCompanyId')
       localStorage.removeItem('platformOperatingCompanyName')
     }
+    setOperatingDispatchCase(
+      res.data.operatingDispatchCaseId,
+      res.data.operatingDispatchCaseCompanyId,
+      res.data.operatingDispatchCaseLabel,
+    )
     loadAdminConfig()
     navigate(res.data.mustChangePassword ? '/change-password' : '/')
   }

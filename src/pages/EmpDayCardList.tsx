@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, InputNumber, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { apiClient } from '../api/client'
+import { apiClient, resolveDefaultCompanyId, resolveOperatingDispatchCaseIdOnly, sortCompaniesTemplateLast } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, EmpDayCardRow, EmployeeListItem, LogPage } from '../types'
 import { formatDate } from '../utils/formatDate'
 import { compareDates, compareNumericLabels, compareStrings } from '../utils/tableSort'
@@ -34,8 +34,9 @@ export default function EmpDayCardList() {
       .get<LogPage<CompanyListItem>>('/admin/companies', { params: { page: 0, size: 200 } })
       .then((res) => {
         setCompanies(res.data.content)
-        if (res.data.content.length > 0) {
-          setCompanyId(res.data.content[0].id)
+        const defaultCompanyId = resolveDefaultCompanyId(res.data.content)
+        if (defaultCompanyId) {
+          setCompanyId(defaultCompanyId)
         }
       })
       .catch(() => message.error('載入客戶清單失敗'))
@@ -49,7 +50,10 @@ export default function EmpDayCardList() {
     if (!companyId) return
     apiClient
       .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
-      .then((res) => setDispatchCases(res.data))
+      .then((res) => {
+        setDispatchCases(res.data)
+        setDispatchCaseId(resolveOperatingDispatchCaseIdOnly(res.data, companyId))
+      })
       .catch(() => setDispatchCases([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId])
@@ -204,7 +208,7 @@ export default function EmpDayCardList() {
             placeholder="選擇客戶"
             value={companyId}
             onChange={setCompanyId}
-            options={companies.map((c) => ({
+            options={sortCompaniesTemplateLast(companies).map((c) => ({
               value: c.id,
               label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
             }))}

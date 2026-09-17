@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react'
 import { Button, DatePicker, Input, Layout, Modal, Select, Space, Upload, message } from 'antd'
 import { LeftOutlined, RightOutlined, UploadOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import { apiClient } from '../api/client'
+import {
+  apiClient,
+  resolveDefaultCompanyId,
+  resolveDefaultDispatchCaseId,
+  sortCompaniesTemplateLast,
+} from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, LeaveTypeMasterItem, LogPage } from '../types'
 import PageHeader from '../components/PageHeader'
 
@@ -103,8 +108,9 @@ export default function EmpScheduleCalendar() {
       .get<LogPage<CompanyListItem>>('/admin/companies', { params: { page: 0, size: 200 } })
       .then((res) => {
         setCompanies(res.data.content)
-        if (res.data.content.length > 0) {
-          setCompanyId(res.data.content[0].id)
+        const defaultCompanyId = resolveDefaultCompanyId(res.data.content)
+        if (defaultCompanyId) {
+          setCompanyId(defaultCompanyId)
         }
       })
       .catch(() => message.error('載入客戶清單失敗'))
@@ -116,10 +122,18 @@ export default function EmpScheduleCalendar() {
       .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
       .then((res) => {
         setDispatchCases(res.data)
-        setDispatchCaseId(res.data.length > 0 ? res.data[0].id : undefined)
+        setDispatchCaseId(resolveDefaultDispatchCaseId(res.data, companyId))
       })
       .catch(() => setDispatchCases([]))
   }, [companyId])
+
+  // 切換客戶時，dispatchCaseId必須跟companyId在同一次render裡一起清空(而不是等上面那個effect
+  // 非同步查完新客戶的個案清單後才清)，否則畫面會先用「新客戶ID+舊個案ID」這組不存在的組合，
+  // 讓下面依賴[companyId, dispatchCaseId]的effect打一次API，導致後端404「找不到派遣個案」閃現。
+  const changeCompany = (v: number | undefined) => {
+    setCompanyId(v)
+    setDispatchCaseId(undefined)
+  }
 
   const basePath = () => `/admin/companies/${companyId}/dispatch-cases/${dispatchCaseId}/schedules`
 
@@ -428,8 +442,8 @@ export default function EmpScheduleCalendar() {
             style={{ width: 360 }}
             placeholder="選擇客戶"
             value={companyId}
-            onChange={setCompanyId}
-            options={companies.map((c) => ({
+            onChange={changeCompany}
+            options={sortCompaniesTemplateLast(companies).map((c) => ({
               value: c.id,
               label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
             }))}

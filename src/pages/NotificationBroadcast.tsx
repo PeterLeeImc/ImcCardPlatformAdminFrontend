@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, DatePicker, Form, Input, Layout, Modal, Select, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
-import { apiClient } from '../api/client'
+import {
+  apiClient,
+  resolveDefaultCompanyId,
+  resolveOperatingDispatchCaseIdOnly,
+  sortCompaniesTemplateLast,
+} from '../api/client'
 import type {
   AdminNotificationItem,
   BroadcastNotificationRequest,
@@ -56,8 +61,9 @@ export default function NotificationBroadcast() {
       .then((res) => {
         setListCompanies(res.data.content)
         setCompanies(res.data.content)
-        if (res.data.content.length > 0) {
-          setListCompanyId(res.data.content[0].id)
+        const defaultCompanyId = resolveDefaultCompanyId(res.data.content)
+        if (defaultCompanyId) {
+          setListCompanyId(defaultCompanyId)
         }
       })
       .catch(() => message.error('載入客戶清單失敗'))
@@ -142,7 +148,10 @@ export default function NotificationBroadcast() {
     if (!listCompanyId) return
     apiClient
       .get<DispatchCaseItem[]>(`/admin/companies/${listCompanyId}/dispatch-cases`)
-      .then((res) => setFilterDispatchCases(res.data))
+      .then((res) => {
+        setFilterDispatchCases(res.data)
+        setFilterDispatchCaseId(resolveOperatingDispatchCaseIdOnly(res.data, listCompanyId))
+      })
       .catch(() => setFilterDispatchCases([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listCompanyId])
@@ -340,7 +349,7 @@ export default function NotificationBroadcast() {
               setListCompanyId(v)
               setPage(0)
             }}
-            options={listCompanies.map((c) => ({
+            options={sortCompaniesTemplateLast(listCompanies).map((c) => ({
               value: c.id,
               label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
             }))}
@@ -447,7 +456,7 @@ export default function NotificationBroadcast() {
               onChange={setCompanyId}
               options={[
                 { value: ALL, label: '全部客戶' },
-                ...companies.map((c) => ({
+                ...sortCompaniesTemplateLast(companies).map((c) => ({
                   value: c.id,
                   label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
                 })),

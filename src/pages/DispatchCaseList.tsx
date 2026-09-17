@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Checkbox, Form, Input, Layout, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
-import { DeleteOutlined, EditOutlined, TableOutlined, TeamOutlined, UndoOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PushpinOutlined, TableOutlined, TeamOutlined, UndoOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { apiClient, isAdvisorRole } from '../api/client'
+import {
+  apiClient,
+  isAdvisorEditingTemplateCompany,
+  isAdvisorRole,
+  resolveDefaultCompanyId,
+  setOperatingDispatchCase,
+  sortCompaniesTemplateLast,
+} from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, DispatchCaseUpsertRequest, LogPage, ManagerOption } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
 import { imcDispatchCaseDetailUrl } from '../utils/imcLinks'
@@ -36,8 +43,11 @@ export default function DispatchCaseList() {
         const fromUrl = Number(searchParams.get('companyId'))
         if (fromUrl && res.data.content.some((c) => c.id === fromUrl)) {
           setCompanyId(fromUrl)
-        } else if (res.data.content.length > 0) {
-          setCompanyId(res.data.content[0].id)
+        } else {
+          const defaultCompanyId = resolveDefaultCompanyId(res.data.content)
+          if (defaultCompanyId) {
+            setCompanyId(defaultCompanyId)
+          }
         }
       })
       .catch(() => message.error('載入客戶清單失敗'))
@@ -130,6 +140,24 @@ export default function DispatchCaseList() {
     })
   }
 
+  const [settingCurrentId, setSettingCurrentId] = useState<number>()
+  const setCurrentDispatchCase = async (row: DispatchCaseItem) => {
+    if (!companyId) return
+    setSettingCurrentId(row.id)
+    try {
+      const res = await apiClient.post<{ id: number; companyId: number; label: string }>(
+        `/admin/companies/${companyId}/dispatch-cases/${row.id}/set-current`,
+      )
+      setOperatingDispatchCase(res.data.id, res.data.companyId, res.data.label)
+      message.success(`已設定目前操作個案：${res.data.label}`)
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: string } }
+      message.error(axiosErr.response?.data ?? '設定失敗')
+    } finally {
+      setSettingCurrentId(undefined)
+    }
+  }
+
   const handleRestore = (row: DispatchCaseItem) => {
     if (!companyId) return
     Modal.confirm({
@@ -147,6 +175,8 @@ export default function DispatchCaseList() {
       },
     })
   }
+
+  const templateLocked = isAdvisorEditingTemplateCompany(companies, companyId)
 
   const columns: ColumnsType<DispatchCaseItem> = [
     {
@@ -175,8 +205,13 @@ export default function DispatchCaseList() {
     },
     {
       title: '負責使用者',
-      dataIndex: 'responsibleUserName',
       key: 'responsibleUserName',
+      render: (_, record) =>
+        record.responsibleUserName
+          ? record.responsibleUserAccount
+            ? `${record.responsibleUserAccount} ${record.responsibleUserName}`
+            : record.responsibleUserName
+          : '-',
       sorter: (a, b) => compareStrings(a.responsibleUserName, b.responsibleUserName),
     },
     {
@@ -209,7 +244,12 @@ export default function DispatchCaseList() {
       render: (_, record) =>
         record.hidden ? (
           <Space size="small">
-            <ActionIcon title="還原" icon={<UndoOutlined />} onClick={() => handleRestore(record)} />
+            <ActionIcon
+              title="還原"
+              icon={<UndoOutlined />}
+              disabled={templateLocked}
+              onClick={() => handleRestore(record)}
+            />
           </Space>
         ) : (
           <Space size="small">
@@ -223,8 +263,25 @@ export default function DispatchCaseList() {
               icon={<TeamOutlined />}
               onClick={() => navigate(`/employees?companyId=${companyId}&dispatchCaseId=${record.id}`)}
             />
-            <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />
-            <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
+            <ActionIcon
+              title="編輯"
+              icon={<EditOutlined />}
+              disabled={templateLocked}
+              onClick={() => openEdit(record)}
+            />
+            <ActionIcon
+              title="刪除"
+              icon={<DeleteOutlined />}
+              danger
+              disabled={templateLocked}
+              onClick={() => handleDelete(record)}
+            />
+            <ActionIcon
+              title={settingCurrentId === record.id ? '設定中...' : '設定個案'}
+              icon={<PushpinOutlined />}
+              disabled={settingCurrentId === record.id}
+              onClick={() => setCurrentDispatchCase(record)}
+            />
           </Space>
         ),
     },
@@ -242,7 +299,7 @@ export default function DispatchCaseList() {
               placeholder="選擇客戶"
               value={companyId}
               onChange={setCompanyId}
-              options={companies.map((c) => ({
+              options={sortCompaniesTemplateLast(companies).map((c) => ({
                 value: c.id,
                 label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
               }))}

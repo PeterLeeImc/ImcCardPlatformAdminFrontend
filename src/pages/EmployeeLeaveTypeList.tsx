@@ -3,7 +3,13 @@ import { DatePicker, Form, Input, InputNumber, Layout, Modal, Select, Space, Tab
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
-import { apiClient } from '../api/client'
+import {
+  apiClient,
+  isAdvisorEditingTemplateCompany,
+  resolveDefaultCompanyId,
+  resolveDefaultDispatchCaseId,
+  sortCompaniesTemplateLast,
+} from '../api/client'
 import type {
   CompanyListItem,
   DispatchCaseItem,
@@ -48,8 +54,9 @@ export default function EmployeeLeaveTypeList() {
       .get<LogPage<CompanyListItem>>('/admin/companies', { params: { page: 0, size: 200 } })
       .then((res) => {
         setCompanies(res.data.content)
-        if (res.data.content.length > 0) {
-          setCompanyId(res.data.content[0].id)
+        const defaultCompanyId = resolveDefaultCompanyId(res.data.content)
+        if (defaultCompanyId) {
+          setCompanyId(defaultCompanyId)
         }
       })
       .catch(() => message.error('載入客戶清單失敗'))
@@ -61,7 +68,7 @@ export default function EmployeeLeaveTypeList() {
       .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
       .then((res) => {
         setDispatchCases(res.data)
-        setDispatchCaseId(res.data.length > 0 ? res.data[0].id : undefined)
+        setDispatchCaseId(resolveDefaultDispatchCaseId(res.data, companyId))
       })
       .catch(() => setDispatchCases([]))
   }, [companyId])
@@ -150,6 +157,8 @@ export default function EmployeeLeaveTypeList() {
     })
   }
 
+  const templateLocked = isAdvisorEditingTemplateCompany(companies, companyId)
+
   const columns: ColumnsType<WebEmpLeaveTypeItem> = [
     {
       title: '序號',
@@ -220,8 +229,14 @@ export default function EmployeeLeaveTypeList() {
       key: 'action',
       render: (_, record) => (
         <Space size="small">
-          <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />
-          <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
+          <ActionIcon title="編輯" icon={<EditOutlined />} disabled={templateLocked} onClick={() => openEdit(record)} />
+          <ActionIcon
+            title="刪除"
+            icon={<DeleteOutlined />}
+            danger
+            disabled={templateLocked}
+            onClick={() => handleDelete(record)}
+          />
         </Space>
       ),
     },
@@ -242,7 +257,7 @@ export default function EmployeeLeaveTypeList() {
                 setCompanyId(v)
                 setPage(0)
               }}
-              options={companies.map((c) => ({
+              options={sortCompaniesTemplateLast(companies).map((c) => ({
                 value: c.id,
                 label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
               }))}

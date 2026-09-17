@@ -3,7 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Checkbox, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import { DeleteOutlined, EditOutlined, KeyOutlined, UndoOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { apiClient, isAdvisorRole } from '../api/client'
+import {
+  apiClient,
+  isAdvisorEditingTemplateCompany,
+  isAdvisorRole,
+  resolveDefaultCompanyId,
+  resolveDefaultDispatchCaseId,
+  sortCompaniesTemplateLast,
+} from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, EmployeeListItem, LogPage } from '../types'
 import { JOB_STATUS_OPTIONS, SEX_OPTIONS } from '../types'
 import PageHeader from '../components/PageHeader'
@@ -41,11 +48,12 @@ export default function EmployeeList() {
         if (companyId && res.data.content.some((c) => c.id === companyId)) {
           return
         }
-        if (res.data.content.length > 0) {
+        const defaultCompanyId = resolveDefaultCompanyId(res.data.content)
+        if (defaultCompanyId) {
           setSearchParams(
             (prev) => {
               const next = new URLSearchParams(prev)
-              next.set('companyId', String(res.data.content[0].id))
+              next.set('companyId', String(defaultCompanyId))
               next.delete('dispatchCaseId')
               return next
             },
@@ -66,11 +74,12 @@ export default function EmployeeList() {
         if (dispatchCaseId && res.data.some((d) => d.id === dispatchCaseId)) {
           return
         }
+        const defaultCaseId = resolveDefaultDispatchCaseId(res.data, companyId)
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev)
-            if (res.data.length > 0) {
-              next.set('dispatchCaseId', String(res.data[0].id))
+            if (defaultCaseId) {
+              next.set('dispatchCaseId', String(defaultCaseId))
             } else {
               next.delete('dispatchCaseId')
             }
@@ -205,6 +214,8 @@ export default function EmployeeList() {
     })
   }
 
+  const templateLocked = isAdvisorEditingTemplateCompany(companies, companyId)
+
   const columns: ColumnsType<EmployeeListItem> = [
     {
       title: '序號',
@@ -298,13 +309,34 @@ export default function EmployeeList() {
       render: (_, record) =>
         record.hidden ? (
           <Space size="small">
-            <ActionIcon title="還原" icon={<UndoOutlined />} onClick={() => handleRestore(record)} />
+            <ActionIcon
+              title="還原"
+              icon={<UndoOutlined />}
+              disabled={templateLocked}
+              onClick={() => handleRestore(record)}
+            />
           </Space>
         ) : (
           <Space size="small">
-            <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => navigate(`/employees/${record.id}`)} />
-            <ActionIcon title="重設密碼" icon={<KeyOutlined />} onClick={() => openResetPassword(record)} />
-            <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
+            <ActionIcon
+              title="編輯"
+              icon={<EditOutlined />}
+              disabled={templateLocked}
+              onClick={() => navigate(`/employees/${record.id}`)}
+            />
+            <ActionIcon
+              title="刪除"
+              icon={<DeleteOutlined />}
+              danger
+              disabled={templateLocked}
+              onClick={() => handleDelete(record)}
+            />
+            <ActionIcon
+              title="重設密碼"
+              icon={<KeyOutlined />}
+              disabled={templateLocked}
+              onClick={() => openResetPassword(record)}
+            />
           </Space>
         ),
     },
@@ -340,7 +372,7 @@ export default function EmployeeList() {
               placeholder="選擇客戶"
               value={companyId}
               onChange={changeCompany}
-              options={companies.map((c) => ({
+              options={sortCompaniesTemplateLast(companies).map((c) => ({
                 value: c.id,
                 label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
               }))}

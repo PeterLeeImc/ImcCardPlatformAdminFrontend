@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button, DatePicker, Form, Input, Layout, Select, Space, Spin, message } from 'antd'
 import dayjs from 'dayjs'
-import { apiClient } from '../api/client'
+import { apiClient, sortCompaniesTemplateLast } from '../api/client'
 import type {
   CompanyListItem,
   DispatchCaseItem,
@@ -230,7 +230,7 @@ export default function EmployeeForm() {
                 <Form.Item name="companyId" label="客戶" rules={[{ required: true, message: '請選擇客戶' }]}>
                   <Select
                     placeholder="選擇客戶"
-                    options={companies.map((c) => ({
+                    options={sortCompaniesTemplateLast(companies).map((c) => ({
                       value: c.id,
                       label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
                     }))}

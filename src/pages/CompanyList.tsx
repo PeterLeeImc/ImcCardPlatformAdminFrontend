@@ -219,14 +219,25 @@ export default function CompanyList() {
               icon={<ApartmentOutlined />}
               onClick={() => navigate(`/dispatch-cases?companyId=${record.id}`)}
             />
-            <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => navigate(`/companies/${record.id}`)} />
+            <ActionIcon
+              title="編輯"
+              icon={<EditOutlined />}
+              disabled={isAdvisorRole() && record.template}
+              onClick={() => navigate(`/companies/${record.id}`)}
+            />
             {!isAdvisorRole() &&
               (record.template ? (
                 <ActionIcon title="取消樣板" icon={<StarFilled />} onClick={() => handleUnsetTemplate(record)} />
               ) : (
                 <ActionIcon title="設為樣板" icon={<StarOutlined />} onClick={() => handleSetTemplate(record)} />
               ))}
-            <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
+            <ActionIcon
+              title="刪除"
+              icon={<DeleteOutlined />}
+              danger
+              disabled={isAdvisorRole() && record.template}
+              onClick={() => handleDelete(record)}
+            />
           </Space>
         ),
     },

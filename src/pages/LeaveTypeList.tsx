@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react'
 import { Button, Checkbox, Form, Input, InputNumber, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import { DeleteOutlined, EditOutlined, UndoOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { apiClient, isAdvisorRole } from '../api/client'
+import {
+  apiClient,
+  isAdvisorEditingTemplateCompany,
+  isAdvisorRole,
+  resolveDefaultCompanyId,
+  resolveDefaultDispatchCaseId,
+  sortCompaniesTemplateLast,
+} from '../api/client'
 import {
   LEAVE_DEFAULT_FILED_OPTIONS,
   LEAVE_SEX_CONDITION_OPTIONS,
@@ -42,8 +49,9 @@ export default function LeaveTypeList() {
       .get<LogPage<CompanyListItem>>('/admin/companies', { params: { page: 0, size: 200 } })
       .then((res) => {
         setCompanies(res.data.content)
-        if (res.data.content.length > 0) {
-          setCompanyId(res.data.content[0].id)
+        const defaultCompanyId = resolveDefaultCompanyId(res.data.content)
+        if (defaultCompanyId) {
+          setCompanyId(defaultCompanyId)
         }
       })
       .catch(() => message.error('載入客戶清單失敗'))
@@ -55,7 +63,7 @@ export default function LeaveTypeList() {
       .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
       .then((res) => {
         setDispatchCases(res.data)
-        setDispatchCaseId(res.data.length > 0 ? res.data[0].id : undefined)
+        setDispatchCaseId(resolveDefaultDispatchCaseId(res.data, companyId))
       })
       .catch(() => setDispatchCases([]))
   }, [companyId])
@@ -184,6 +192,8 @@ export default function LeaveTypeList() {
   const labelOf = (options: { value: string; label: string }[], value: string | null) =>
     options.find((o) => o.value === value)?.label ?? '-'
 
+  const templateLocked = isAdvisorEditingTemplateCompany(companies, companyId)
+
   const columns: ColumnsType<LeaveTypeMasterItem> = [
     {
       title: '序號',
@@ -249,12 +259,28 @@ export default function LeaveTypeList() {
       render: (_, record) =>
         record.hidden ? (
           <Space size="small">
-            <ActionIcon title="還原" icon={<UndoOutlined />} onClick={() => handleRestore(record)} />
+            <ActionIcon
+              title="還原"
+              icon={<UndoOutlined />}
+              disabled={templateLocked}
+              onClick={() => handleRestore(record)}
+            />
           </Space>
         ) : (
           <Space size="small">
-            <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />
-            <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
+            <ActionIcon
+              title="編輯"
+              icon={<EditOutlined />}
+              disabled={templateLocked}
+              onClick={() => openEdit(record)}
+            />
+            <ActionIcon
+              title="刪除"
+              icon={<DeleteOutlined />}
+              danger
+              disabled={templateLocked}
+              onClick={() => handleDelete(record)}
+            />
           </Space>
         ),
     },
@@ -279,7 +305,7 @@ export default function LeaveTypeList() {
               placeholder="選擇客戶"
               value={companyId}
               onChange={setCompanyId}
-              options={companies.map((c) => ({
+              options={sortCompaniesTemplateLast(companies).map((c) => ({
                 value: c.id,
                 label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
               }))}

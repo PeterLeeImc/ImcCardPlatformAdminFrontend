@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Button, Form, Input, InputNumber, Layout, Modal, Select, Space, Switch, Table, message } from 'antd'
-import { CopyOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { CopyOutlined, DeleteOutlined, EditOutlined, SyncOutlined } from '@ant-design/icons'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { ColumnsType } from 'antd/es/table'
-import { apiClient } from '../api/client'
+import {
+  apiClient,
+  isAdvisorEditingTemplateCompany,
+  resolveDefaultCompanyId,
+  resolveDefaultDispatchCaseId,
+  sortCompaniesTemplateLast,
+} from '../api/client'
 import type { CompanyListItem, ComTimeScheduleItem, ComTimeScheduleUpsertRequest, DispatchCaseItem, LogPage } from '../types'
 import { PUNCH_METHOD_OPTIONS } from '../types'
 import { shortenAddressCandidates } from '../utils/shortenAddressCandidates'
@@ -113,11 +119,12 @@ export default function ComTimeScheduleList() {
         if (companyId && res.data.content.some((c) => c.id === companyId)) {
           return
         }
-        if (res.data.content.length > 0) {
+        const defaultCompanyId = resolveDefaultCompanyId(res.data.content)
+        if (defaultCompanyId) {
           setSearchParams(
             (prev) => {
               const next = new URLSearchParams(prev)
-              next.set('companyId', String(res.data.content[0].id))
+              next.set('companyId', String(defaultCompanyId))
               next.delete('dispatchCaseId')
               return next
             },
@@ -138,11 +145,12 @@ export default function ComTimeScheduleList() {
         if (dispatchCaseId && res.data.some((d) => d.id === dispatchCaseId)) {
           return
         }
+        const defaultCaseId = resolveDefaultDispatchCaseId(res.data, companyId)
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev)
-            if (res.data.length > 0) {
-              next.set('dispatchCaseId', String(res.data[0].id))
+            if (defaultCaseId) {
+              next.set('dispatchCaseId', String(defaultCaseId))
             } else {
               next.delete('dispatchCaseId')
             }
@@ -402,6 +410,27 @@ export default function ComTimeScheduleList() {
       ? PUNCH_METHOD_OPTIONS.find((o) => o.value === record.punchMethod)?.label ?? record.punchMethod ?? '-'
       : '(依客戶設定)'
 
+  const templateLocked = isAdvisorEditingTemplateCompany(companies, companyId)
+
+  // 「同步員工班段」：只有員工班段配置採[標準班表]的個案才有意義(採每月提供排班的個案要靠人資自行排班)，
+  // 即時觸發跟排程[標準班表自動排班]同一套邏輯，但只處理目前選擇的這個個案，不是全系統掃描。
+  const selectedDispatchCase = dispatchCases.find((d) => d.id === dispatchCaseId)
+  const canSyncEmployeeSchedule = selectedDispatchCase != null && !selectedDispatchCase.useCustomSchedule
+  const [syncingSchedule, setSyncingSchedule] = useState(false)
+  const syncEmployeeSchedule = async () => {
+    if (!dispatchCaseId) return
+    setSyncingSchedule(true)
+    try {
+      const res = await apiClient.post<string>(`${basePath}/sync-employee-schedule`)
+      message.success(res.data)
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: string } }
+      message.error(axiosErr.response?.data ?? '同步失敗')
+    } finally {
+      setSyncingSchedule(false)
+    }
+  }
+
   const columns: ColumnsType<ComTimeScheduleItem> = [
     {
       title: '序號',
@@ -466,14 +495,28 @@ export default function ComTimeScheduleList() {
       key: 'action',
       render: (_, record) => (
         <Space size="small">
-          <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+          <ActionIcon title="編輯" icon={<EditOutlined />} disabled={templateLocked} onClick={() => openEdit(record)} />
+          <ActionIcon
+            title="刪除"
+            icon={<DeleteOutlined />}
+            danger
+            disabled={templateLocked}
+            onClick={() => handleDelete(record)}
+          />
           <ActionIcon
             title={copying === record.id ? '複製中...' : '複製'}
             icon={<CopyOutlined />}
-            disabled={copying === record.id}
+            disabled={templateLocked || copying === record.id}
             onClick={() => handleCopy(record)}
           />
-          <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
+          {canSyncEmployeeSchedule && (
+            <ActionIcon
+              title={syncingSchedule ? '同步中...' : '同步員工班段'}
+              icon={<SyncOutlined />}
+              disabled={templateLocked || syncingSchedule}
+              onClick={syncEmployeeSchedule}
+            />
+          )}
         </Space>
       ),
     },
@@ -500,7 +543,7 @@ export default function ComTimeScheduleList() {
               placeholder="選擇客戶"
               value={companyId}
               onChange={changeCompany}
-              options={companies.map((c) => ({
+              options={sortCompaniesTemplateLast(companies).map((c) => ({
                 value: c.id,
                 label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
               }))}

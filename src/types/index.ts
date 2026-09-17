@@ -299,8 +299,9 @@ export interface DispatchCaseItem {
   id: number
   caseCode: string
   responsibleUserId: number | null
+  responsibleUserAccount: string | null
   responsibleUserName: string | null
-  /** 班段採首筆班表或每月自訂：true=每月自訂、false=首筆班表(固定套用這個派遣個案第一筆班表)。 */
+  /** 員工班段配置：true=採每月提供排班、false=採標準班表(固定套用這個派遣個案的標準班表)。 */
   useCustomSchedule: boolean
   defaultOvertimeChangeToCompTime: boolean
   hidden: boolean
