@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Checkbox, Form, Input, Layout, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
+import { Checkbox, Form, Input, Layout, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
 import { DeleteOutlined, EditOutlined, TableOutlined, TeamOutlined, UndoOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, isAdvisorRole } from '../api/client'
@@ -180,20 +180,20 @@ export default function DispatchCaseList() {
       sorter: (a, b) => compareStrings(a.responsibleUserName, b.responsibleUserName),
     },
     {
-      title: '班段採首筆班表或每月自訂',
+      title: '員工班段配置',
       dataIndex: 'useCustomSchedule',
       key: 'useCustomSchedule',
-      render: (v: boolean) => (v ? '每月自訂' : '首筆班表'),
+      render: (v: boolean) => (v ? '採每月提供排班' : '採標準班表'),
       sorter: (a, b) =>
-        compareStrings(a.useCustomSchedule ? '每月自訂' : '首筆班表', b.useCustomSchedule ? '每月自訂' : '首筆班表'),
+        compareStrings(a.useCustomSchedule ? '採每月提供排班' : '採標準班表', b.useCustomSchedule ? '採每月提供排班' : '採標準班表'),
     },
     {
-      title: '加班預設換算',
+      title: '加班換算配置',
       dataIndex: 'defaultOvertimeChangeToCompTime',
       key: 'defaultOvertimeChangeToCompTime',
-      render: (v: boolean) => (v ? '補休' : '加班費(現金)'),
+      render: (v: boolean) => (v ? '補休' : '加班費'),
       sorter: (a, b) =>
-        compareStrings(a.defaultOvertimeChangeToCompTime ? '補休' : '加班費(現金)', b.defaultOvertimeChangeToCompTime ? '補休' : '加班費(現金)'),
+        compareStrings(a.defaultOvertimeChangeToCompTime ? '補休' : '加班費', b.defaultOvertimeChangeToCompTime ? '補休' : '加班費'),
     },
     {
       title: '備註',
@@ -232,14 +232,7 @@ export default function DispatchCaseList() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
-      <PageHeader
-        title="個案維護"
-        actions={
-          <Button type="primary" onClick={() => openEdit('new')} disabled={!companyId}>
-            新增個案
-          </Button>
-        }
-      />
+      <PageHeader title="個案維護" />
       <div style={{ padding: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
           <Space>
@@ -308,21 +301,25 @@ export default function DispatchCaseList() {
           </Form.Item>
           <Form.Item
             name="useCustomSchedule"
-            label="班段採首筆班表或每月自訂"
+            label="員工班段配置"
             valuePropName="checked"
-            tooltip="首筆班表：固定套用這個派遣個案的第一筆班表；每月自訂：每個月自行安排班段"
+            tooltip={
+              editing !== 'new'
+                ? '建立個案時設定後不允許修改'
+                : '採標準班表：固定套用這個派遣個案的第一筆班表；採每月提供排班：每個月自行安排班段'
+            }
             initialValue={false}
           >
-            <Switch checkedChildren="每月自訂" unCheckedChildren="首筆班表" />
+            <Switch checkedChildren="採每月提供排班" unCheckedChildren="採標準班表" disabled={editing !== 'new'} />
           </Form.Item>
           <Form.Item
             name="defaultOvertimeChangeToCompTime"
-            label="加班申請核准後預設換算方式"
+            label="加班換算配置"
             valuePropName="checked"
             tooltip="這個個案底下的員工送出加班申請時不再自己選擇，一律依這個個案的預設值換算"
             initialValue={false}
           >
-            <Switch checkedChildren="換算成補休" unCheckedChildren="換算成加班費(現金)" />
+            <Switch checkedChildren="補休" unCheckedChildren="加班費" />
           </Form.Item>
           <Form.Item name="descr" label="備註">
             <Input.TextArea placeholder="備註" rows={3} />

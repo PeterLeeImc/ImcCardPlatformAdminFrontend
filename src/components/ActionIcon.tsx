@@ -20,7 +20,14 @@ export default function ActionIcon({
 }) {
   return (
     <Tooltip title={title}>
-      <Button type="text" size="small" icon={icon} danger={danger} disabled={disabled} onClick={onClick} />
+      <Button
+        type="text"
+        size="middle"
+        icon={<span style={{ fontSize: 18, display: 'inline-flex' }}>{icon}</span>}
+        danger={danger}
+        disabled={disabled}
+        onClick={onClick}
+      />
     </Tooltip>
   )
 }
