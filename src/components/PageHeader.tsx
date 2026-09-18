@@ -48,16 +48,27 @@ export default function PageHeader({ title, actions }: { title: ReactNode; actio
           title
         )}
       </div>
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
-        <Space size={16}>
-          <a onClick={() => navigate('/')}>首頁</a>
-          <span style={{ color: '#666', whiteSpace: 'nowrap' }}>{displayName} 您好</span>
-          <span style={{ color: '#666', whiteSpace: 'nowrap' }}>
+      <div style={{ flex: 2, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
+        <Space size={16} style={{ minWidth: 0 }}>
+          <a onClick={() => navigate('/')} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+            首頁
+          </a>
+          <span style={{ color: '#666', whiteSpace: 'nowrap', flexShrink: 0 }}>{displayName} 您好</span>
+          <span
+            title={operatingDispatchCaseLabel ?? undefined}
+            style={{
+              color: '#666',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: 360,
+            }}
+          >
             目前操作個案：{operatingDispatchCaseLabel ?? '(未設定)'}
           </span>
           <span
             onClick={clearSessionAndRedirectToLogin}
-            style={{ cursor: 'pointer', color: '#1677ff', whiteSpace: 'nowrap' }}
+            style={{ cursor: 'pointer', color: '#1677ff', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <LogoutOutlined /> 登出
           </span>

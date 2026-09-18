@@ -41,7 +41,10 @@ export function clearSessionAndRedirectToLogin() {
   localStorage.removeItem('platformOperatingDispatchCaseCompanyId')
   localStorage.removeItem('platformOperatingDispatchCaseLabel')
   localStorage.removeItem('platformRole')
-  window.location.href = '/login'
+  // 用瀏覽器導頁(不是React Router的Navigate)，所以要自己補上BASE_URL前綴：正式打包部署在
+  // 非根路徑(/ImcCardPlatformAdmin/)時，寫死的絕對路徑"/login"會導去網域根目錄(打卡RWD員工端
+  // 的登入頁)，不是這個SPA自己的登入頁，這裡要跟App.tsx的BrowserRouter basename保持一致。
+  window.location.href = `${import.meta.env.BASE_URL}login`
 }
 
 /** 「目前操作個案」變更時觸發的事件名稱：PageHeader訂閱這個事件即時更新頁首顯示，

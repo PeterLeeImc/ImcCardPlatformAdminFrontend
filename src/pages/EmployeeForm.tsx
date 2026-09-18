@@ -26,6 +26,7 @@ interface EmployeeFormValues {
   role: string
   sex: string
   mobilePhone: string
+  jobTitle: string
   takeDate: dayjs.Dayjs | null
   leaveDate: dayjs.Dayjs | null
   jobStatus: string
@@ -98,6 +99,7 @@ export default function EmployeeForm() {
           role: d.role,
           sex: d.sex ?? undefined,
           mobilePhone: d.mobilePhone ?? '',
+          jobTitle: d.jobTitle ?? '',
           takeDate: d.takeDate ? dayjs(d.takeDate) : null,
           leaveDate: d.leaveDate ? dayjs(d.leaveDate) : null,
           jobStatus: d.jobStatus ?? undefined,
@@ -154,6 +156,7 @@ export default function EmployeeForm() {
         role: values.role,
         sex: values.sex,
         mobilePhone: values.mobilePhone || undefined,
+        jobTitle: values.jobTitle || undefined,
         takeDate: values.takeDate ? values.takeDate.format(WIRE_DATE_FORMAT) : undefined,
         leaveDate: values.leaveDate ? values.leaveDate.format(WIRE_DATE_FORMAT) : undefined,
         jobStatus: values.jobStatus,
@@ -262,6 +265,9 @@ export default function EmployeeForm() {
               <Select options={SEX_OPTIONS} allowClear />
             </Form.Item>
             <Form.Item name="mobilePhone" label="行動電話">
+              <Input />
+            </Form.Item>
+            <Form.Item name="jobTitle" label="工作職稱">
               <Input />
             </Form.Item>
             <Space style={{ width: '100%' }}>

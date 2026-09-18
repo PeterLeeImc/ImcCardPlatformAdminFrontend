@@ -268,6 +268,13 @@ export default function EmployeeList() {
       sorter: (a, b) => compareStrings(a.mobilePhone, b.mobilePhone),
     },
     {
+      title: '工作職稱',
+      dataIndex: 'jobTitle',
+      key: 'jobTitle',
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.jobTitle, b.jobTitle),
+    },
+    {
       title: '到職日',
       dataIndex: 'takeDate',
       key: 'takeDate',

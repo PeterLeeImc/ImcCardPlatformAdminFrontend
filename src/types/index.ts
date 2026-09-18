@@ -298,6 +298,7 @@ export const ANNUAL_EFFECTIVE_DATE_OPTIONS = [
 export interface DispatchCaseItem {
   id: number
   caseCode: string
+  jobTitle: string | null
   responsibleUserId: number | null
   responsibleUserAccount: string | null
   responsibleUserName: string | null
@@ -314,6 +315,7 @@ export interface DispatchCaseItem {
 
 export interface DispatchCaseUpsertRequest {
   caseCode: string
+  jobTitle?: string
   responsibleUserId?: number | null
   useCustomSchedule: boolean
   defaultOvertimeChangeToCompTime: boolean
@@ -433,6 +435,7 @@ export interface EmployeeListItem {
   jobStatusLabel: string | null
   sex: string | null
   mobilePhone: string | null
+  jobTitle: string | null
   takeDate: string | null
   takeDateDay: number | null
   leaveDate: string | null
@@ -453,6 +456,7 @@ export interface EmployeeDetail {
   dispatchCaseCode: string | null
   sex: string | null
   mobilePhone: string | null
+  jobTitle: string | null
   takeDate: string | null
   leaveDate: string | null
   jobStatus: string | null
@@ -474,6 +478,7 @@ export interface EmployeeUpsertRequest {
   role: string
   sex?: string
   mobilePhone?: string
+  jobTitle?: string
   takeDate?: string
   leaveDate?: string
   jobStatus?: string

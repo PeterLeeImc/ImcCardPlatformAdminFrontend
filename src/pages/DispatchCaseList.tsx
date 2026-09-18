@@ -88,6 +88,7 @@ export default function DispatchCaseList() {
     } else {
       form.setFieldsValue({
         caseCode: row.caseCode,
+        jobTitle: row.jobTitle ?? undefined,
         responsibleUserId: row.responsibleUserId ?? undefined,
         useCustomSchedule: row.useCustomSchedule,
         defaultOvertimeChangeToCompTime: row.defaultOvertimeChangeToCompTime,
@@ -202,6 +203,13 @@ export default function DispatchCaseList() {
         </>
       ),
       sorter: (a, b) => compareStrings(a.caseCode, b.caseCode),
+    },
+    {
+      title: '工作職稱',
+      dataIndex: 'jobTitle',
+      key: 'jobTitle',
+      render: (v: string | null) => v ?? '-',
+      sorter: (a, b) => compareStrings(a.jobTitle, b.jobTitle),
     },
     {
       title: '負責使用者',
@@ -346,6 +354,13 @@ export default function DispatchCaseList() {
         <Form form={form} layout="vertical">
           <Form.Item name="caseCode" label="個案編號" tooltip="IMC個案編號" rules={[{ required: true, message: '請輸入個案編號' }]}>
             <Input />
+          </Form.Item>
+          <Form.Item
+            name="jobTitle"
+            label="工作職稱"
+            tooltip="IMC個案人才轉員工時，會把這裡的工作職稱複製給新建立的員工"
+          >
+            <Input placeholder="工作職稱" />
           </Form.Item>
           <Form.Item name="responsibleUserId" label="負責使用者">
             <Select
