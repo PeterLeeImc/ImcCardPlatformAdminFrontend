@@ -190,6 +190,7 @@ export interface CompanyDetail {
   longitude: number | null
   punchMethod: string | null
   gpsRadiusMeters: number | null
+  enforceGpsRadius: boolean
   template: boolean
   hidden: boolean
   descr: string | null
@@ -208,6 +209,7 @@ export interface CompanyCreateRequest {
   longitude?: number
   punchMethod?: string
   gpsRadiusMeters?: number
+  enforceGpsRadius?: boolean
   descr?: string
 }
 
@@ -390,6 +392,13 @@ export interface WorkOvertimeUpsertRequest {
 
 // 班表內容 (company time schedule master)
 
+export interface ScheduleLocation {
+  addr: string | null
+  latitude: number | null
+  longitude: number | null
+  gpsRadiusMeters: number | null
+}
+
 export interface ComTimeScheduleItem {
   id: number
   workType: string
@@ -398,11 +407,9 @@ export interface ComTimeScheduleItem {
   noonBreakStartTime: string | null
   noonBreakEndTime: string | null
   useCustomLocation: boolean
-  addr: string | null
-  latitude: number | null
-  longitude: number | null
+  /** 這個班別自訂的工作地點清單，可以有多筆，任一筆範圍內打卡都算有效。 */
+  locations: ScheduleLocation[]
   punchMethod: string | null
-  gpsRadiusMeters: number | null
   descr: string | null
   createdAt: string | null
   createdBy: string | null
@@ -417,11 +424,8 @@ export interface ComTimeScheduleUpsertRequest {
   noonBreakStartTime?: string
   noonBreakEndTime?: string
   useCustomLocation: boolean
-  addr?: string
-  latitude?: number
-  longitude?: number
+  locations?: ScheduleLocation[]
   punchMethod?: string
-  gpsRadiusMeters?: number
   descr?: string
 }
 

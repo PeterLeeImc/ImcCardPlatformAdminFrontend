@@ -8,6 +8,7 @@ import { compareDates, compareNumericLabels, compareStrings } from '../utils/tab
 import PageHeader from '../components/PageHeader'
 import ResultCount from '../components/ResultCount'
 import PageSizeSelect from '../components/PageSizeSelect'
+import ApproxLocationLink from '../components/ApproxLocationLink'
 
 const ALL_EMPLOYEES = 0
 const WHOLE_MONTH = 0
@@ -180,6 +181,16 @@ export default function EmpDayCardList() {
       render: (_, record) =>
         record.locationValid == null ? '' : <Tag color={record.locationValid ? 'blue' : 'red'}>{record.locationValid ? '範圍內' : '超出範圍'}</Tag>,
       sorter: (a, b) => compareStrings(String(a.locationValid ?? ''), String(b.locationValid ?? '')),
+    },
+    {
+      title: '上班大約位置',
+      key: 'startApproxLocation',
+      render: (_, record) => <ApproxLocationLink latitude={record.startLatitude} longitude={record.startLongitude} />,
+    },
+    {
+      title: '下班大約位置',
+      key: 'endApproxLocation',
+      render: (_, record) => <ApproxLocationLink latitude={record.endLatitude} longitude={record.endLongitude} />,
     },
     {
       title: '照片',

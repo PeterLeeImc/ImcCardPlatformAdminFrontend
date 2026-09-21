@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Button, Form, Input, InputNumber, Layout, Modal, Select, Space, Switch, Table, message } from 'antd'
-import { CopyOutlined, DeleteOutlined, EditOutlined, SyncOutlined } from '@ant-design/icons'
+import { Button, Form, Input, InputNumber, Layout, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
+import { CopyOutlined, DeleteOutlined, EditOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -13,11 +13,18 @@ import {
   resolveDefaultDispatchCaseId,
   sortCompaniesTemplateLast,
 } from '../api/client'
-import type { CompanyListItem, ComTimeScheduleItem, ComTimeScheduleUpsertRequest, DispatchCaseItem, LogPage } from '../types'
+import type {
+  CompanyListItem,
+  ComTimeScheduleItem,
+  ComTimeScheduleUpsertRequest,
+  DispatchCaseItem,
+  LogPage,
+  ScheduleLocation,
+} from '../types'
 import { PUNCH_METHOD_OPTIONS } from '../types'
 import { shortenAddressCandidates } from '../utils/shortenAddressCandidates'
 import { formatDateTime } from '../utils/formatDateTime'
-import { compareNumbers, compareStrings } from '../utils/tableSort'
+import { compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
 import ActionIcon from '../components/ActionIcon'
 import ResultCount from '../components/ResultCount'
@@ -80,9 +87,7 @@ interface ScheduleFormValues {
   noonBreakStartTime?: string
   noonBreakEndTime?: string
   useCustomLocation: boolean
-  addr?: string
   punchMethod?: string
-  gpsRadiusMeters?: number
   descr?: string
 }
 
@@ -100,11 +105,18 @@ export default function ComTimeScheduleList() {
   const [copyingFromTemplate, setCopyingFromTemplate] = useState(false)
   const [editing, setEditing] = useState<ComTimeScheduleItem | 'new'>()
   const [saving, setSaving] = useState(false)
-  const [geocoding, setGeocoding] = useState(false)
-  const [savedPosition, setSavedPosition] = useState<[number, number] | null>(null)
-  const [pendingPosition, setPendingPosition] = useState<[number, number] | null>(null)
   const [useCustomLocation, setUseCustomLocation] = useState(false)
+  const [locations, setLocations] = useState<ScheduleLocation[]>([])
   const [form] = Form.useForm<ScheduleFormValues>()
+
+  // 工作地點清單裡，正在新增/編輯的其中一筆地點(獨立的子表單+地圖，避免一次在畫面上疊多張地圖)。
+  const [locationEditorOpen, setLocationEditorOpen] = useState(false)
+  const [locationEditorIndex, setLocationEditorIndex] = useState<number | null>(null)
+  const [locAddr, setLocAddr] = useState('')
+  const [locGpsRadiusMeters, setLocGpsRadiusMeters] = useState(200)
+  const [locSavedPosition, setLocSavedPosition] = useState<[number, number] | null>(null)
+  const [locPendingPosition, setLocPendingPosition] = useState<[number, number] | null>(null)
+  const [geocoding, setGeocoding] = useState(false)
 
   const templateCompany = companies.find((c) => c.template)
   const canCopyFromTemplate = !!templateCompany && !!companyId && templateCompany.id !== companyId
@@ -241,11 +253,10 @@ export default function ComTimeScheduleList() {
 
   const openEdit = (row: ComTimeScheduleItem | 'new') => {
     setEditing(row)
-    setPendingPosition(null)
     if (row === 'new') {
       form.resetFields()
       setUseCustomLocation(false)
-      setSavedPosition(null)
+      setLocations([])
     } else {
       form.setFieldsValue({
         workType: row.workType,
@@ -254,32 +265,46 @@ export default function ComTimeScheduleList() {
         noonBreakStartTime: row.noonBreakStartTime ?? undefined,
         noonBreakEndTime: row.noonBreakEndTime ?? undefined,
         useCustomLocation: row.useCustomLocation,
-        addr: row.addr ?? undefined,
         punchMethod: row.punchMethod ?? 'GPS',
-        gpsRadiusMeters: row.gpsRadiusMeters ?? 200,
         descr: row.descr ?? undefined,
       })
       setUseCustomLocation(row.useCustomLocation)
-      setSavedPosition(row.latitude != null && row.longitude != null ? [row.latitude, row.longitude] : null)
+      setLocations(row.locations ?? [])
     }
   }
 
+  const openLocationEditor = (index?: number) => {
+    if (index != null) {
+      const loc = locations[index]
+      setLocationEditorIndex(index)
+      setLocAddr(loc.addr ?? '')
+      setLocGpsRadiusMeters(loc.gpsRadiusMeters ?? 200)
+      setLocSavedPosition(loc.latitude != null && loc.longitude != null ? [loc.latitude, loc.longitude] : null)
+    } else {
+      setLocationEditorIndex(null)
+      setLocAddr('')
+      setLocGpsRadiusMeters(200)
+      setLocSavedPosition(null)
+    }
+    setLocPendingPosition(null)
+    setLocationEditorOpen(true)
+  }
+
   const applyPendingPosition = () => {
-    if (pendingPosition) {
-      setSavedPosition(pendingPosition)
-      setPendingPosition(null)
+    if (locPendingPosition) {
+      setLocSavedPosition(locPendingPosition)
+      setLocPendingPosition(null)
     }
   }
 
   const geocodeAddress = async () => {
-    const addr = form.getFieldValue('addr') as string
-    if (!addr || !addr.trim()) {
+    if (!locAddr.trim()) {
       message.warning('請先輸入地址')
       return
     }
     setGeocoding(true)
     try {
-      const candidates = shortenAddressCandidates(addr.trim())
+      const candidates = shortenAddressCandidates(locAddr.trim())
       for (let i = 0; i < candidates.length; i++) {
         const candidate = candidates[i]
         const res = await fetch(
@@ -288,7 +313,7 @@ export default function ComTimeScheduleList() {
         )
         const results = (await res.json()) as { lat: string; lon: string }[]
         if (results.length > 0) {
-          setPendingPosition([parseFloat(results[0].lat), parseFloat(results[0].lon)])
+          setLocPendingPosition([parseFloat(results[0].lat), parseFloat(results[0].lon)])
           if (i === 0) {
             message.success('已在地圖上標出查詢到的位置，請確認後按「套用地圖座標」')
           } else {
@@ -307,10 +332,40 @@ export default function ComTimeScheduleList() {
     }
   }
 
+  const saveLocationEditor = () => {
+    if (!locSavedPosition) {
+      message.error('請先在地圖上點選位置並套用座標')
+      return
+    }
+    const entry: ScheduleLocation = {
+      addr: locAddr.trim() || null,
+      latitude: locSavedPosition[0],
+      longitude: locSavedPosition[1],
+      gpsRadiusMeters: locGpsRadiusMeters,
+    }
+    setLocations((prev) => {
+      if (locationEditorIndex != null) {
+        const next = [...prev]
+        next[locationEditorIndex] = entry
+        return next
+      }
+      return [...prev, entry]
+    })
+    setLocationEditorOpen(false)
+  }
+
+  const removeLocation = (index: number) => {
+    setLocations((prev) => prev.filter((_, i) => i !== index))
+  }
+
   const submitEdit = async () => {
     if (!editing || !companyId || !dispatchCaseId) return
     try {
       const values = await form.validateFields()
+      if (values.useCustomLocation && locations.length === 0) {
+        message.error('請至少新增一個工作地點')
+        return
+      }
       const body: ComTimeScheduleUpsertRequest = {
         workType: values.workType,
         onTime: values.onTime,
@@ -318,11 +373,8 @@ export default function ComTimeScheduleList() {
         noonBreakStartTime: values.noonBreakStartTime,
         noonBreakEndTime: values.noonBreakEndTime,
         useCustomLocation: values.useCustomLocation,
-        addr: values.useCustomLocation ? values.addr : undefined,
-        latitude: values.useCustomLocation ? savedPosition?.[0] : undefined,
-        longitude: values.useCustomLocation ? savedPosition?.[1] : undefined,
+        locations: values.useCustomLocation ? locations : undefined,
         punchMethod: values.useCustomLocation ? values.punchMethod : undefined,
-        gpsRadiusMeters: values.useCustomLocation ? values.gpsRadiusMeters : undefined,
         descr: values.descr,
       }
       setSaving(true)
@@ -348,7 +400,7 @@ export default function ComTimeScheduleList() {
 
   /**
    * 複製這筆班表：新班別編號="原代碼-N"，N從1開始依序遞增，跳過已經存在的代碼(例如已經有
-   * "日班-1"就改試"日班-2")，其餘欄位(時間/工作地點設定)原樣複製，不彈窗確認、點了就直接建立。
+   * "日班-1"就改試"日班-2")，其餘欄位(時間/工作地點清單)原樣複製，不彈窗確認、點了就直接建立。
    */
   const handleCopy = async (row: ComTimeScheduleItem) => {
     const existingCodes = new Set(rows.map((r) => r.workType))
@@ -367,11 +419,8 @@ export default function ComTimeScheduleList() {
         noonBreakStartTime: row.noonBreakStartTime ?? undefined,
         noonBreakEndTime: row.noonBreakEndTime ?? undefined,
         useCustomLocation: row.useCustomLocation,
-        addr: row.addr ?? undefined,
-        latitude: row.latitude ?? undefined,
-        longitude: row.longitude ?? undefined,
+        locations: row.locations,
         punchMethod: row.punchMethod ?? undefined,
-        gpsRadiusMeters: row.gpsRadiusMeters ?? undefined,
         descr: row.descr ?? undefined,
       }
       await apiClient.post(basePath, body)
@@ -403,8 +452,13 @@ export default function ComTimeScheduleList() {
     })
   }
 
-  const addrLabel = (record: ComTimeScheduleItem) =>
-    record.useCustomLocation ? record.addr ?? '(未設定地址)' : '客戶預設地址'
+  const addrLabel = (record: ComTimeScheduleItem) => {
+    if (!record.useCustomLocation) return '客戶預設地址'
+    const count = record.locations?.length ?? 0
+    if (count === 0) return '(未設定地址)'
+    const first = record.locations[0].addr ?? '(未命名地點)'
+    return count > 1 ? `${first} 等${count}處` : first
+  }
   const punchMethodLabel = (record: ComTimeScheduleItem) =>
     record.useCustomLocation
       ? PUNCH_METHOD_OPTIONS.find((o) => o.value === record.punchMethod)?.label ?? record.punchMethod ?? '-'
@@ -476,13 +530,6 @@ export default function ComTimeScheduleList() {
       sorter: (a, b) => compareStrings(punchMethodLabel(a), punchMethodLabel(b)),
     },
     {
-      title: 'GPS打卡有效半徑(公尺)',
-      key: 'gpsRadiusMeters',
-      render: (_, record) => (record.useCustomLocation ? record.gpsRadiusMeters ?? '-' : '(依客戶設定)'),
-      sorter: (a, b) =>
-        compareNumbers(a.useCustomLocation ? a.gpsRadiusMeters : null, b.useCustomLocation ? b.gpsRadiusMeters : null),
-    },
-    {
       title: '備註',
       dataIndex: 'descr',
       key: 'descr',
@@ -522,7 +569,29 @@ export default function ComTimeScheduleList() {
     },
   ]
 
-  const mapCenter = pendingPosition ?? savedPosition ?? DEFAULT_CENTER
+  const locationColumns: ColumnsType<ScheduleLocation> = [
+    { title: '地址', dataIndex: 'addr', key: 'addr', render: (v: string | null) => v ?? '(未命名地點)' },
+    {
+      title: '座標',
+      key: 'coord',
+      render: (_, loc) =>
+        loc.latitude != null && loc.longitude != null ? `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}` : '-',
+    },
+    { title: '有效半徑(公尺)', dataIndex: 'gpsRadiusMeters', key: 'gpsRadiusMeters' },
+    {
+      title: '操作',
+      key: 'action',
+      width: 100,
+      render: (_, __, index) => (
+        <Space size="small">
+          <ActionIcon title="編輯" icon={<EditOutlined />} onClick={() => openLocationEditor(index)} />
+          <ActionIcon title="刪除" icon={<DeleteOutlined />} danger onClick={() => removeLocation(index)} />
+        </Space>
+      ),
+    },
+  ]
+
+  const locMapCenter = locPendingPosition ?? locSavedPosition ?? DEFAULT_CENTER
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f6f8' }}>
@@ -593,9 +662,9 @@ export default function ComTimeScheduleList() {
         onOk={submitEdit}
         confirmLoading={saving}
         destroyOnHidden
-        width={680}
+        width={720}
       >
-        <Form form={form} layout="vertical" initialValues={{ useCustomLocation: false, punchMethod: 'GPS', gpsRadiusMeters: 200 }}>
+        <Form form={form} layout="vertical" initialValues={{ useCustomLocation: false, punchMethod: 'GPS' }}>
           <Form.Item name="workType" label="班別編號" rules={[{ required: true, message: '請輸入班別編號' }]}>
             <Input placeholder="例如：A1" />
           </Form.Item>
@@ -615,63 +684,33 @@ export default function ComTimeScheduleList() {
             name="useCustomLocation"
             label="工作地點"
             valuePropName="checked"
-            tooltip="有些客戶有多處工作地點需求：關閉時這個班別的員工打卡沿用客戶地址設定；開啟後可以另外設定這個班別專屬的打卡地點(例如夜班在廠區、日班在總部)"
+            tooltip="有些客戶有多處工作地點需求：關閉時這個班別的員工打卡沿用客戶地址設定；開啟後可以另外設定這個班別專屬的打卡地點清單(可以新增多筆，例如總部+分點，員工在任一處打卡都算有效)"
           >
             <Switch checkedChildren="自訂工作地點" unCheckedChildren="使用客戶預設地址" onChange={setUseCustomLocation} />
           </Form.Item>
           {useCustomLocation && (
             <>
-              <Form.Item label="工作地址">
-                <Space.Compact style={{ width: '100%' }}>
-                  <Form.Item name="addr" noStyle>
-                    <Input placeholder="地址" />
-                  </Form.Item>
-                  <Button loading={geocoding} onClick={geocodeAddress}>
-                    地址轉座標
-                  </Button>
-                </Space.Compact>
-              </Form.Item>
               <Form.Item name="punchMethod" label="打卡方式">
                 <Select options={PUNCH_METHOD_OPTIONS} />
               </Form.Item>
-              <Form.Item name="gpsRadiusMeters" label="GPS打卡有效半徑(公尺)">
-                <InputNumber min={1} style={{ width: 200 }} />
-              </Form.Item>
-              <Form.Item label="打卡地點座標">
-                <div style={{ marginBottom: 8, fontSize: 13, color: '#666' }}>
-                  在地圖上點選要設定的位置(紅點)，確認無誤後按「套用地圖座標」(藍點)才會真的儲存。
-                  {savedPosition && (
-                    <span>
-                      　目前座標：{savedPosition[0].toFixed(6)}, {savedPosition[1].toFixed(6)}
-                    </span>
-                  )}
-                </div>
-                <MapContainer
-                  center={mapCenter}
-                  zoom={savedPosition || pendingPosition ? 16 : 7}
-                  style={{ height: 260, width: '100%' }}
+              <Form.Item label="工作地點清單">
+                <Table
+                  rowKey={(_, index) => index ?? 0}
+                  size="small"
+                  columns={locationColumns}
+                  dataSource={locations}
+                  pagination={false}
+                  locale={{ emptyText: '尚未新增工作地點' }}
+                />
+                <Button
+                  type="dashed"
+                  block
+                  icon={<PlusOutlined />}
+                  style={{ marginTop: 8 }}
+                  onClick={() => openLocationEditor()}
                 >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  <LocationPicker
-                    savedPosition={savedPosition}
-                    pendingPosition={pendingPosition}
-                    onPick={(lat, lng) => setPendingPosition([lat, lng])}
-                  />
-                  <MapFlyTo position={pendingPosition ?? savedPosition} />
-                </MapContainer>
-                {pendingPosition && (
-                  <div style={{ marginTop: 8 }}>
-                    <Space>
-                      <Button type="primary" onClick={applyPendingPosition}>
-                        套用地圖座標
-                      </Button>
-                      <Button onClick={() => setPendingPosition(null)}>取消</Button>
-                    </Space>
-                  </div>
-                )}
+                  新增工作地點
+                </Button>
               </Form.Item>
             </>
           )}
@@ -684,6 +723,65 @@ export default function ComTimeScheduleList() {
             建立時間：{formatDateTime(editing.createdAt)}　建立者：{editing.createdBy ?? '-'}　異動時間：
             {formatDateTime(editing.updatedAt)}　異動者：{editing.updatedBy ?? '-'}
           </div>
+        )}
+      </Modal>
+
+      <Modal
+        title={locationEditorIndex != null ? '編輯工作地點' : '新增工作地點'}
+        open={locationEditorOpen}
+        onCancel={() => setLocationEditorOpen(false)}
+        onOk={saveLocationEditor}
+        destroyOnHidden
+        width={600}
+        zIndex={1100}
+      >
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 4, fontSize: 13 }}>地址</div>
+          <Space.Compact style={{ width: '100%' }}>
+            <Input placeholder="地址" value={locAddr} onChange={(e) => setLocAddr(e.target.value)} />
+            <Button loading={geocoding} onClick={geocodeAddress}>
+              地址轉座標
+            </Button>
+          </Space.Compact>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 4, fontSize: 13 }}>GPS打卡有效半徑(公尺)</div>
+          <InputNumber min={1} style={{ width: 200 }} value={locGpsRadiusMeters} onChange={(v) => setLocGpsRadiusMeters(v ?? 200)} />
+        </div>
+        <div style={{ marginBottom: 8, fontSize: 13, color: '#666' }}>
+          在地圖上點選要設定的位置(紅點)，確認無誤後按「套用地圖座標」(藍點)才會真的儲存。
+          {locSavedPosition && (
+            <span>
+              　目前座標：{locSavedPosition[0].toFixed(6)}, {locSavedPosition[1].toFixed(6)}
+            </span>
+          )}
+        </div>
+        <MapContainer center={locMapCenter} zoom={locSavedPosition || locPendingPosition ? 16 : 7} style={{ height: 260, width: '100%' }}>
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <LocationPicker
+            savedPosition={locSavedPosition}
+            pendingPosition={locPendingPosition}
+            onPick={(lat, lng) => setLocPendingPosition([lat, lng])}
+          />
+          <MapFlyTo position={locPendingPosition ?? locSavedPosition} />
+        </MapContainer>
+        {locPendingPosition && (
+          <div style={{ marginTop: 8 }}>
+            <Space>
+              <Button type="primary" onClick={applyPendingPosition}>
+                套用地圖座標
+              </Button>
+              <Button onClick={() => setLocPendingPosition(null)}>取消</Button>
+            </Space>
+          </div>
+        )}
+        {!locSavedPosition && (
+          <Tag color="warning" style={{ marginTop: 8 }}>
+            尚未套用座標，無法儲存這個地點
+          </Tag>
         )}
       </Modal>
     </Layout>

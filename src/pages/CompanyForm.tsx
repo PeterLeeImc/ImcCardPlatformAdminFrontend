@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Form, Input, InputNumber, Layout, Select, Space, Spin, message } from 'antd'
+import { Button, Form, Input, InputNumber, Layout, Select, Space, Spin, Switch, message } from 'antd'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -9,6 +9,7 @@ import type { CompanyCreateRequest, CompanyDetail, CompanyUpdateRequest, Custome
 import { PUNCH_METHOD_OPTIONS } from '../types'
 import { formatDateTime } from '../utils/formatDateTime'
 import { shortenAddressCandidates } from '../utils/shortenAddressCandidates'
+import { reverseGeocode } from '../utils/reverseGeocode'
 import PageHeader from '../components/PageHeader'
 
 const DEFAULT_CENTER: [number, number] = [23.9739, 120.9797] // 台灣中心點，還沒有座標時的預設地圖中心
@@ -31,6 +32,7 @@ interface CompanyFormValues {
   addr: string
   punchMethod: string
   gpsRadiusMeters: number
+  enforceGpsRadius: boolean
   descr: string
 }
 
@@ -86,6 +88,7 @@ export default function CompanyForm() {
   const [geocoding, setGeocoding] = useState(false)
   const [savedPosition, setSavedPosition] = useState<[number, number] | null>(null)
   const [pendingPosition, setPendingPosition] = useState<[number, number] | null>(null)
+  const [approxLocation, setApproxLocation] = useState<string>()
   const [detail, setDetail] = useState<CompanyDetail>()
   const [customerSerial, setCustomerSerial] = useState('')
   const [customerLookupLoading, setCustomerLookupLoading] = useState(false)
@@ -105,6 +108,7 @@ export default function CompanyForm() {
           addr: d.addr ?? '',
           punchMethod: d.punchMethod ?? 'GPS',
           gpsRadiusMeters: d.gpsRadiusMeters ?? 200,
+          enforceGpsRadius: d.enforceGpsRadius,
           descr: d.descr ?? '',
         })
         if (d.latitude != null && d.longitude != null) {
@@ -117,6 +121,16 @@ export default function CompanyForm() {
       })
       .finally(() => setLoading(false))
   }, [id, isEdit, form])
+
+  // 座標存檔後查詢一次大約位置(縣市/行政區/路)，只是給管理者確認座標抓對了沒，不是必要欄位。
+  useEffect(() => {
+    if (!savedPosition) {
+      setApproxLocation(undefined)
+      return
+    }
+    setApproxLocation('查詢中...')
+    reverseGeocode(savedPosition[0], savedPosition[1]).then((result) => setApproxLocation(result ?? undefined))
+  }, [savedPosition])
 
   const applyPendingPosition = () => {
     if (pendingPosition) {
@@ -197,6 +211,7 @@ export default function CompanyForm() {
         longitude: savedPosition?.[1],
         punchMethod: values.punchMethod,
         gpsRadiusMeters: values.gpsRadiusMeters,
+        enforceGpsRadius: values.enforceGpsRadius,
         descr: values.descr || undefined,
       }
       if (isEdit) {
@@ -254,7 +269,7 @@ export default function CompanyForm() {
             form={form}
             layout="vertical"
             onFinish={onFinish}
-            initialValues={{ punchMethod: 'GPS', gpsRadiusMeters: 200 }}
+            initialValues={{ punchMethod: 'GPS', gpsRadiusMeters: 200, enforceGpsRadius: false }}
           >
             {isEdit ? (
               <Form.Item label="客戶編號" tooltip="IMC客戶編號">
@@ -289,6 +304,14 @@ export default function CompanyForm() {
             <Form.Item name="punchMethod" label="打卡方式">
               <Select options={PUNCH_METHOD_OPTIONS} />
             </Form.Item>
+            <Form.Item
+              name="enforceGpsRadius"
+              label="強制在範圍內才能打卡"
+              valuePropName="checked"
+              tooltip="關閉(預設)：員工在GPS有效範圍外仍可打卡，只記錄距離供事後查核；開啟：範圍外會直接擋下打卡(沒有定位也會被擋)，只在打卡方式為GPS時有意義"
+            >
+              <Switch checkedChildren="開啟" unCheckedChildren="關閉" />
+            </Form.Item>
             <Form.Item name="gpsRadiusMeters" label="GPS打卡有效半徑(公尺)">
               <InputNumber min={1} style={{ width: 200 }} />
             </Form.Item>
@@ -298,6 +321,7 @@ export default function CompanyForm() {
                 {savedPosition && (
                   <span>
                     　目前座標：{savedPosition[0].toFixed(6)}, {savedPosition[1].toFixed(6)}
+                    {approxLocation && `(大約位置：${approxLocation})`}
                   </span>
                 )}
               </div>
