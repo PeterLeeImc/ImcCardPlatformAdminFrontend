@@ -397,6 +397,8 @@ export interface ScheduleLocation {
   latitude: number | null
   longitude: number | null
   gpsRadiusMeters: number | null
+  /** 這個地點有效半徑外是否不允許打卡(true=不允許，false=允許)。 */
+  enforceGpsRadius: boolean
 }
 
 export interface ComTimeScheduleItem {
@@ -550,6 +552,60 @@ export interface EmpDayCardRow {
   effectiveHoursLabel: string
 }
 
+/** 某位員工某一天的單筆打卡明細(每按一次打卡一筆)。 */
+export interface EmpDayPunch {
+  punchTime: string
+  latitude: number | null
+  longitude: number | null
+  locationValid: boolean | null
+  /** true=補卡核准後補登的紀錄(沒有定位)。 */
+  correction: boolean
+}
+
+// 員工每日請假 / 員工每日加班 / 簽核代理人維護
+
+interface EmpDayApplicationBase {
+  id: number
+  employeeId: number
+  employeeNum: string
+  dispatchCaseCode: string | null
+  employeeChname: string
+  serialNo: string | null
+  /** yyyy-MM-dd HH:mm */
+  startDate: string
+  endDate: string
+  hours: number | null
+  descr: string | null
+  statusCode: string | null
+  statusName: string | null
+  defaultApprover: string | null
+  actualApprover: string | null
+  delegateNote: string | null
+  /** 簽核備註(簽核人簽核時填的，沒填為null)。 */
+  explain: string | null
+}
+
+export interface EmpDayLeaveRow extends EmpDayApplicationBase {
+  leaveTypeName: string | null
+}
+
+export interface EmpDayOvertimeRow extends EmpDayApplicationBase {
+  overtimeTypeName: string | null
+}
+
+export interface AdminApprovalDelegateRow {
+  id: number
+  employeeId: number
+  employeeNum: string
+  dispatchCaseCode: string | null
+  employeeChname: string
+  delegateEmployeenum: string
+  delegateChname: string
+  startDate: string
+  endDate: string
+  statusName: '生效中' | '未開始' | '已結束'
+}
+
 // 出勤明細報表
 
 export interface AttendanceReportRow {
@@ -568,6 +624,10 @@ export interface AttendanceReportRow {
   overtimeStart: string
   overtimeEnd: string
   overtimeHours: string
+  startLatitude: number | null
+  startLongitude: number | null
+  endLatitude: number | null
+  endLongitude: number | null
 }
 
 // 排程管理

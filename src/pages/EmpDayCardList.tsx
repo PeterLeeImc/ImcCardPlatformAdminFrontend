@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, InputNumber, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { apiClient, resolveDefaultCompanyId, resolveOperatingDispatchCaseIdOnly, sortCompaniesTemplateLast } from '../api/client'
-import type { CompanyListItem, DispatchCaseItem, EmpDayCardRow, EmployeeListItem, LogPage } from '../types'
+import type { CompanyListItem, DispatchCaseItem, EmpDayCardRow, EmpDayPunch, EmployeeListItem, LogPage } from '../types'
 import { formatDate } from '../utils/formatDate'
 import { compareDates, compareNumericLabels, compareStrings } from '../utils/tableSort'
 import PageHeader from '../components/PageHeader'
@@ -29,6 +29,7 @@ export default function EmpDayCardList() {
   const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
   const [photoModal, setPhotoModal] = useState<{ title: string; url: string }>()
+  const [punchModal, setPunchModal] = useState<{ title: string; punches?: EmpDayPunch[] }>()
 
   useEffect(() => {
     apiClient
@@ -103,6 +104,40 @@ export default function EmpDayCardList() {
       message.error('載入照片失敗')
     }
   }
+
+  // 點開某位員工某一天的全部打卡明細(每按一次打卡一筆)，主表只看得到第一筆(上班)/最後一筆(下班)。
+  const viewPunches = (record: EmpDayCardRow) => {
+    setPunchModal({ title: `${record.employeeChname} ${formatDate(record.rowDate)} 打卡明細` })
+    apiClient
+      .get<EmpDayPunch[]>(`/admin/emp-day-cards/${record.employeeId}/punches`, { params: { day: record.rowDate } })
+      .then((res) => setPunchModal({ title: `${record.employeeChname} ${formatDate(record.rowDate)} 打卡明細`, punches: res.data }))
+      .catch(() => {
+        message.error('載入打卡明細失敗')
+        setPunchModal(undefined)
+      })
+  }
+
+  const punchColumns: ColumnsType<EmpDayPunch> = [
+    { title: '序號', key: 'seq', width: 60, render: (_, __, index) => index + 1 },
+    { title: '打卡時間', dataIndex: 'punchTime', key: 'punchTime' },
+    {
+      title: '定位',
+      key: 'location',
+      render: (_, p) =>
+        p.correction ? (
+          <Tag>補卡</Tag>
+        ) : p.locationValid == null ? (
+          '-'
+        ) : (
+          <Tag color={p.locationValid ? 'blue' : 'red'}>{p.locationValid ? '範圍內' : '超出範圍'}</Tag>
+        ),
+    },
+    {
+      title: '大約位置',
+      key: 'approx',
+      render: (_, p) => <ApproxLocationLink latitude={p.latitude} longitude={p.longitude} />,
+    },
+  ]
 
   const closePhotoModal = () => {
     if (photoModal) {
@@ -191,6 +226,11 @@ export default function EmpDayCardList() {
       title: '下班大約位置',
       key: 'endApproxLocation',
       render: (_, record) => <ApproxLocationLink latitude={record.endLatitude} longitude={record.endLongitude} />,
+    },
+    {
+      title: '打卡明細',
+      key: 'punches',
+      render: (_, record) => (record.punched ? <a onClick={() => viewPunches(record)}>查看明細</a> : ''),
     },
     {
       title: '照片',
@@ -286,6 +326,24 @@ export default function EmpDayCardList() {
           }}
         />
       </div>
+      <Modal
+        title={punchModal?.title}
+        open={!!punchModal}
+        onCancel={() => setPunchModal(undefined)}
+        footer={null}
+        width={640}
+        destroyOnHidden
+      >
+        <Table
+          rowKey={(_, index) => String(index)}
+          size="small"
+          loading={!punchModal?.punches}
+          columns={punchColumns}
+          dataSource={punchModal?.punches ?? []}
+          pagination={false}
+          locale={{ emptyText: '這一天沒有打卡明細' }}
+        />
+      </Modal>
       <Modal title={photoModal?.title} open={!!photoModal} onCancel={closePhotoModal} footer={null}>
         {photoModal && <img src={photoModal.url} alt={photoModal.title} style={{ width: '100%' }} />}
       </Modal>

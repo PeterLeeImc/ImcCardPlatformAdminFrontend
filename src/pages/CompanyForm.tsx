@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Form, Input, InputNumber, Layout, Select, Space, Spin, Switch, message } from 'antd'
+import { Button, Form, Input, InputNumber, Layout, Radio, Select, Space, Spin, message } from 'antd'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -304,16 +304,20 @@ export default function CompanyForm() {
             <Form.Item name="punchMethod" label="打卡方式">
               <Select options={PUNCH_METHOD_OPTIONS} />
             </Form.Item>
-            <Form.Item
-              name="enforceGpsRadius"
-              label="強制在範圍內才能打卡"
-              valuePropName="checked"
-              tooltip="關閉(預設)：員工在GPS有效範圍外仍可打卡，只記錄距離供事後查核；開啟：範圍外會直接擋下打卡(沒有定位也會被擋)，只在打卡方式為GPS時有意義"
-            >
-              <Switch checkedChildren="開啟" unCheckedChildren="關閉" />
-            </Form.Item>
             <Form.Item name="gpsRadiusMeters" label="GPS打卡有效半徑(公尺)">
               <InputNumber min={1} style={{ width: 200 }} />
+            </Form.Item>
+            <Form.Item
+              name="enforceGpsRadius"
+              label="打卡方圓範圍外可進行打卡"
+              tooltip="允許(預設)：員工在有效半徑外仍可打卡，只記錄距離供事後查核；不允許：範圍外會直接擋下打卡(沒有定位也會被擋)，只在打卡方式為GPS時有意義"
+            >
+              <Radio.Group
+                options={[
+                  { label: '允許', value: false },
+                  { label: '不允許', value: true },
+                ]}
+              />
             </Form.Item>
             <Form.Item label="打卡地點座標">
               <div style={{ marginBottom: 8, fontSize: 13, color: '#666' }}>

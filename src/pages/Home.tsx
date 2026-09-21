@@ -23,6 +23,9 @@ import {
   DatabaseOutlined,
   TableOutlined,
   SyncOutlined,
+  CoffeeOutlined,
+  HourglassOutlined,
+  SwapOutlined,
 } from '@ant-design/icons'
 
 const RESET_CONFIRM_TEXT = 'RESET'
@@ -145,6 +148,27 @@ export default function Home() {
           label: '員工每日打卡',
           desc: '查看員工打卡明細與照片',
           icon: <ClockCircleOutlined style={{ fontSize: 32 }} />,
+        },
+        {
+          key: '/emp-day-leaves',
+          rightName: '維護作業|員工每日請假',
+          label: '員工每日請假',
+          desc: '查看員工請假單與簽核狀況',
+          icon: <CoffeeOutlined style={{ fontSize: 32 }} />,
+        },
+        {
+          key: '/emp-day-overtimes',
+          rightName: '維護作業|員工每日加班',
+          label: '員工每日加班',
+          desc: '查看員工加班單與簽核狀況',
+          icon: <HourglassOutlined style={{ fontSize: 32 }} />,
+        },
+        {
+          key: '/approval-delegates',
+          rightName: '維護作業|簽核代理人維護',
+          label: '簽核代理人維護',
+          desc: '幫員工設定/取消簽核代理人',
+          icon: <SwapOutlined style={{ fontSize: 32 }} />,
         },
         {
           key: '/attendance-detail-report',

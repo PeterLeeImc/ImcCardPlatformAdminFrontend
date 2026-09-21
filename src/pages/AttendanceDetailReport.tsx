@@ -8,6 +8,7 @@ import { compareDates, compareNumericLabels, compareStrings } from '../utils/tab
 import PageHeader from '../components/PageHeader'
 import ResultCount from '../components/ResultCount'
 import PageSizeSelect from '../components/PageSizeSelect'
+import ApproxLocationLink from '../components/ApproxLocationLink'
 
 const ALL_EMPLOYEES = 0
 const today = new Date()
@@ -164,6 +165,16 @@ export default function AttendanceDetailReport() {
       dataIndex: 'cardEnd',
       key: 'cardEnd',
       sorter: (a, b) => compareStrings(a.cardEnd, b.cardEnd),
+    },
+    {
+      title: '上班大約位置',
+      key: 'startApproxLocation',
+      render: (_, record) => <ApproxLocationLink latitude={record.startLatitude} longitude={record.startLongitude} />,
+    },
+    {
+      title: '下班大約位置',
+      key: 'endApproxLocation',
+      render: (_, record) => <ApproxLocationLink latitude={record.endLatitude} longitude={record.endLongitude} />,
     },
     {
       title: '打卡時數',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Button, Form, Input, InputNumber, Layout, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
+import { Button, Form, Input, InputNumber, Layout, Modal, Radio, Select, Space, Switch, Table, Tag, message } from 'antd'
 import { CopyOutlined, DeleteOutlined, EditOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
@@ -114,6 +114,7 @@ export default function ComTimeScheduleList() {
   const [locationEditorIndex, setLocationEditorIndex] = useState<number | null>(null)
   const [locAddr, setLocAddr] = useState('')
   const [locGpsRadiusMeters, setLocGpsRadiusMeters] = useState(200)
+  const [locEnforceGpsRadius, setLocEnforceGpsRadius] = useState(false)
   const [locSavedPosition, setLocSavedPosition] = useState<[number, number] | null>(null)
   const [locPendingPosition, setLocPendingPosition] = useState<[number, number] | null>(null)
   const [geocoding, setGeocoding] = useState(false)
@@ -279,11 +280,13 @@ export default function ComTimeScheduleList() {
       setLocationEditorIndex(index)
       setLocAddr(loc.addr ?? '')
       setLocGpsRadiusMeters(loc.gpsRadiusMeters ?? 200)
+      setLocEnforceGpsRadius(loc.enforceGpsRadius)
       setLocSavedPosition(loc.latitude != null && loc.longitude != null ? [loc.latitude, loc.longitude] : null)
     } else {
       setLocationEditorIndex(null)
       setLocAddr('')
       setLocGpsRadiusMeters(200)
+      setLocEnforceGpsRadius(false)
       setLocSavedPosition(null)
     }
     setLocPendingPosition(null)
@@ -342,6 +345,7 @@ export default function ComTimeScheduleList() {
       latitude: locSavedPosition[0],
       longitude: locSavedPosition[1],
       gpsRadiusMeters: locGpsRadiusMeters,
+      enforceGpsRadius: locEnforceGpsRadius,
     }
     setLocations((prev) => {
       if (locationEditorIndex != null) {
@@ -579,6 +583,12 @@ export default function ComTimeScheduleList() {
     },
     { title: '有效半徑(公尺)', dataIndex: 'gpsRadiusMeters', key: 'gpsRadiusMeters' },
     {
+      title: '範圍外打卡',
+      dataIndex: 'enforceGpsRadius',
+      key: 'enforceGpsRadius',
+      render: (v: boolean) => (v ? '不允許' : '允許'),
+    },
+    {
       title: '操作',
       key: 'action',
       width: 100,
@@ -747,6 +757,17 @@ export default function ComTimeScheduleList() {
         <div style={{ marginBottom: 12 }}>
           <div style={{ marginBottom: 4, fontSize: 13 }}>GPS打卡有效半徑(公尺)</div>
           <InputNumber min={1} style={{ width: 200 }} value={locGpsRadiusMeters} onChange={(v) => setLocGpsRadiusMeters(v ?? 200)} />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 4, fontSize: 13 }}>打卡方圓範圍外可進行打卡</div>
+          <Radio.Group
+            value={locEnforceGpsRadius}
+            onChange={(e) => setLocEnforceGpsRadius(e.target.value)}
+            options={[
+              { label: '允許', value: false },
+              { label: '不允許', value: true },
+            ]}
+          />
         </div>
         <div style={{ marginBottom: 8, fontSize: 13, color: '#666' }}>
           在地圖上點選要設定的位置(紅點)，確認無誤後按「套用地圖座標」(藍點)才會真的儲存。

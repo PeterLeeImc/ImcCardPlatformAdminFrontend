@@ -19,6 +19,9 @@ import DispatchCaseList from './pages/DispatchCaseList'
 import EmployeeList from './pages/EmployeeList'
 import EmployeeForm from './pages/EmployeeForm'
 import EmpDayCardList from './pages/EmpDayCardList'
+import EmpDayLeaveList from './pages/EmpDayLeaveList'
+import EmpDayOvertimeList from './pages/EmpDayOvertimeList'
+import ApprovalDelegateList from './pages/ApprovalDelegateList'
 import AttendanceDetailReport from './pages/AttendanceDetailReport'
 import LeaveTypeList from './pages/LeaveTypeList'
 import WorkOvertimeList from './pages/WorkOvertimeList'
@@ -217,6 +220,30 @@ export default function App() {
           element={
             <RequireAuth>
               <EmpDayCardList />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/emp-day-leaves"
+          element={
+            <RequireAuth>
+              <EmpDayLeaveList />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/emp-day-overtimes"
+          element={
+            <RequireAuth>
+              <EmpDayOvertimeList />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/approval-delegates"
+          element={
+            <RequireAuth>
+              <ApprovalDelegateList />
             </RequireAuth>
           }
         />
