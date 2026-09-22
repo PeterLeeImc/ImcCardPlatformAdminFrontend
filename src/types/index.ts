@@ -178,6 +178,8 @@ export interface CompanyListItem {
   /** 顧問角色刪除只是隱藏(軟刪除)，系統管理者/系統使用者可以還原或真的刪除。 */
   hidden: boolean
   descr: string | null
+  /** 目前登入者能不能編輯/刪除這家客戶：顧問角色看得到全部客戶，但只有資料範圍內的才能編輯/刪除。 */
+  editable: boolean
 }
 
 export interface CompanyDetail {
@@ -198,6 +200,8 @@ export interface CompanyDetail {
   createdBy: string | null
   updatedAt: string | null
   updatedBy: string | null
+  /** 目前登入者能不能編輯/刪除這家客戶：顧問角色看得到全部客戶，但只有資料範圍內的才能編輯/刪除。 */
+  editable: boolean
 }
 
 export interface CompanyCreateRequest {

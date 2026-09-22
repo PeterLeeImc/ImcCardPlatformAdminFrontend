@@ -222,7 +222,7 @@ export default function CompanyList() {
             <ActionIcon
               title="編輯"
               icon={<EditOutlined />}
-              disabled={isAdvisorRole() && record.template}
+              disabled={!record.editable}
               onClick={() => navigate(`/companies/${record.id}`)}
             />
             {!isAdvisorRole() &&
@@ -235,7 +235,7 @@ export default function CompanyList() {
               title="刪除"
               icon={<DeleteOutlined />}
               danger
-              disabled={isAdvisorRole() && record.template}
+              disabled={!record.editable}
               onClick={() => handleDelete(record)}
             />
           </Space>
