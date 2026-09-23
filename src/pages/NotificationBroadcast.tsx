@@ -5,7 +5,7 @@ import type { Dayjs } from 'dayjs'
 import {
   apiClient,
   resolveDefaultCompanyId,
-  resolveOperatingDispatchCaseIdOnly,
+  resolveDefaultDispatchCaseId,
   sortCompaniesTemplateLast,
 } from '../api/client'
 import type {
@@ -150,7 +150,7 @@ export default function NotificationBroadcast() {
       .get<DispatchCaseItem[]>(`/admin/companies/${listCompanyId}/dispatch-cases`)
       .then((res) => {
         setFilterDispatchCases(res.data)
-        setFilterDispatchCaseId(resolveOperatingDispatchCaseIdOnly(res.data, listCompanyId))
+        setFilterDispatchCaseId(resolveDefaultDispatchCaseId(res.data, listCompanyId))
       })
       .catch(() => setFilterDispatchCases([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps

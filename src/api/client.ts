@@ -100,19 +100,6 @@ export function resolveDefaultDispatchCaseId(
   return cases.length > 0 ? cases[0].id : undefined
 }
 
-/** 跟resolveDefaultDispatchCaseId類似，但找不到「目前操作個案」時回傳undefined、不強制退回清單
- * 第一筆——給預設值本來就是「全部個案」的畫面用(例如「員工每日打卡」「出勤明細報表」)，這些畫面
- * 沒有設定「目前操作個案」時應該維持原本查全部的行為，不該被迫多選一個個案。 */
-export function resolveOperatingDispatchCaseIdOnly(
-  cases: { id: number }[],
-  companyId: number | undefined,
-): number | undefined {
-  const operating = getOperatingDispatchCase()
-  if (operating && operating.companyId === companyId && cases.some((d) => d.id === operating.id)) {
-    return operating.id
-  }
-  return undefined
-}
 
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('platformToken')

@@ -138,7 +138,13 @@ export default function EmpScheduleCalendar() {
   const basePath = () => `/admin/companies/${companyId}/dispatch-cases/${dispatchCaseId}/schedules`
 
   useEffect(() => {
-    if (!companyId || !dispatchCaseId) return
+    if (!companyId || !dispatchCaseId) {
+      // 同load()的理由：沒有清空的話，切到沒個案時這三個下拉/清單會繼續顯示上一個個案的資料。
+      setEmployees([])
+      setShiftOptions([])
+      setOfficialLeaveTypes([])
+      return
+    }
     apiClient
       .get<AdminEmployeeOption[]>(`${basePath()}/employees`)
       .then((res) => setEmployees(res.data))
@@ -156,7 +162,13 @@ export default function EmpScheduleCalendar() {
   }, [companyId, dispatchCaseId])
 
   const load = () => {
-    if (!companyId || !dispatchCaseId) return
+    if (!companyId || !dispatchCaseId) {
+      // 切換客戶/個案時，dispatchCaseId會先變成undefined一個render(見changeCompany()的說明)，
+      // 這裡沒有清空days的話，畫面會繼續顯示上一個已選個案的排班資料，讓使用者誤以為現在看到的
+      // 還是「這個」個案的班表。
+      setDays([])
+      return
+    }
     setLoading(true)
     apiClient
       .get<ScheduleDay[]>(`${basePath()}/calendar`, {

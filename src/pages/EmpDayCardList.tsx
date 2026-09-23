@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, InputNumber, Layout, Modal, Select, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { apiClient, resolveDefaultCompanyId, resolveOperatingDispatchCaseIdOnly, sortCompaniesTemplateLast } from '../api/client'
+import { apiClient, resolveDefaultCompanyId, resolveDefaultDispatchCaseId, sortCompaniesTemplateLast } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, EmpDayCardRow, EmpDayPunch, EmployeeListItem, LogPage } from '../types'
 import { formatDate } from '../utils/formatDate'
 import { compareDates, compareNumericLabels, compareStrings } from '../utils/tableSort'
@@ -54,7 +54,7 @@ export default function EmpDayCardList() {
       .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
       .then((res) => {
         setDispatchCases(res.data)
-        setDispatchCaseId(resolveOperatingDispatchCaseIdOnly(res.data, companyId))
+        setDispatchCaseId(resolveDefaultDispatchCaseId(res.data, companyId))
       })
       .catch(() => setDispatchCases([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps

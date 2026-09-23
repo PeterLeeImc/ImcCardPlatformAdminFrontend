@@ -74,6 +74,9 @@ export default function EmployeeLeaveTypeList() {
   }, [companyId])
 
   useEffect(() => {
+    // 換個案時，之前選的假別不一定適用於新個案(甚至新個案可能完全沒設定任何假別)，
+    // 一定要清空，不然選單會繼續顯示一個跟新個案無關的舊假別、還拿它的id去查表格。
+    setLeaveTypeId(undefined)
     if (!dispatchCaseId || !year) {
       setLeaveTypeOptions([])
       return
@@ -89,7 +92,14 @@ export default function EmployeeLeaveTypeList() {
     setLoading(true)
     apiClient
       .get<LogPage<WebEmpLeaveTypeItem>>('/admin/employee-leave-types', {
-        params: { companyId, year, leaveTypeId: leaveTypeId || undefined, page: targetPage, size: pageSize },
+        params: {
+          companyId,
+          year,
+          dispatchCaseId: dispatchCaseId || undefined,
+          leaveTypeId: leaveTypeId || undefined,
+          page: targetPage,
+          size: pageSize,
+        },
       })
       .then((res) => setData(res.data))
       .catch((err) => {
@@ -102,7 +112,7 @@ export default function EmployeeLeaveTypeList() {
   useEffect(() => {
     fetchRows(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, year, leaveTypeId, page, pageSize])
+  }, [companyId, dispatchCaseId, year, leaveTypeId, page, pageSize])
 
   const openEdit = (row: WebEmpLeaveTypeItem) => {
     setEditing(row)
@@ -262,12 +272,16 @@ export default function EmployeeLeaveTypeList() {
                 label: c.template ? `[樣板] ${c.companyNum} ${c.chName}` : `${c.companyNum} ${c.chName}`,
               }))}
             />
-            <span>選擇個案(篩選假別選項)：</span>
+            <span>選擇個案：</span>
             <Select
               style={{ width: 200 }}
-              placeholder="選擇個案(篩選假別選項)"
+              placeholder="個案(全部)"
+              allowClear
               value={dispatchCaseId}
-              onChange={setDispatchCaseId}
+              onChange={(v) => {
+                setDispatchCaseId(v)
+                setPage(0)
+              }}
               options={dispatchCases.map((d) => ({ value: d.id, label: d.caseCode }))}
             />
             <Input

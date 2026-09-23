@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Select, message } from 'antd'
-import { apiClient, resolveDefaultCompanyId, resolveOperatingDispatchCaseIdOnly, sortCompaniesTemplateLast } from '../api/client'
+import { apiClient, resolveDefaultCompanyId, resolveDefaultDispatchCaseId, sortCompaniesTemplateLast } from '../api/client'
 import type { CompanyListItem, DispatchCaseItem, EmployeeListItem, LogPage } from '../types'
 
 export const ALL_EMPLOYEES = 0
@@ -40,7 +40,7 @@ export function useCompanyCaseEmployee() {
       .get<DispatchCaseItem[]>(`/admin/companies/${companyId}/dispatch-cases`)
       .then((res) => {
         setDispatchCases(res.data)
-        setDispatchCaseId(resolveOperatingDispatchCaseIdOnly(res.data, companyId))
+        setDispatchCaseId(resolveDefaultDispatchCaseId(res.data, companyId))
       })
       .catch(() => setDispatchCases([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
