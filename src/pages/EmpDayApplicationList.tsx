@@ -71,7 +71,6 @@ export default function EmpDayApplicationList({ title, endpoint, typeColumnTitle
       title: '員工編號',
       dataIndex: 'employeeNum',
       key: 'employeeNum',
-      render: (v: string, record) => (record.dispatchCaseCode ? `${record.dispatchCaseCode}/${v}` : v),
       sorter: (a, b) => compareStrings(a.employeeNum, b.employeeNum),
     },
     {

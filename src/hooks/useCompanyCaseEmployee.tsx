@@ -48,13 +48,24 @@ export function useCompanyCaseEmployee() {
 
   useEffect(() => {
     setEmployeeId(ALL_EMPLOYEES)
-    if (!companyId) return
+    setEmployees([])
+    // 員工下拉只列「所選個案」裡的員工，不是整家客戶的員工：還沒選個案(含換客戶後個案清單尚在載入)時不查詢，
+    // 避免用「未選個案=整家客戶」的查詢結果晚回來、蓋掉之後才回來的個案員工清單。
+    if (!companyId || !dispatchCaseId) return
+    let cancelled = false
     apiClient
       .get<LogPage<EmployeeListItem>>('/admin/employees', {
         params: { companyId, dispatchCaseId, page: 0, size: 500 },
       })
-      .then((res) => setEmployees(res.data.content))
-      .catch(() => setEmployees([]))
+      .then((res) => {
+        if (!cancelled) setEmployees(res.data.content)
+      })
+      .catch(() => {
+        if (!cancelled) setEmployees([])
+      })
+    return () => {
+      cancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, dispatchCaseId])
 
