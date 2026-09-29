@@ -46,7 +46,14 @@ export default function Login() {
   }, [])
 
   const doLogin = async (values: LoginFormValues, confirmed: boolean) => {
-    const res = await apiClient.post<LoginResponse>('/auth/login', { ...values, captchaToken, confirmed })
+    // loginAs: 'manager'讓後端跳過Employee查詢直接查Manager，避免帳號字串剛好跟RWD員工端某個
+    // Employee帳號相同時，被誤判成員工登入(看到的症狀是登入成功但角色/權限完全不對，見AuthController.login())。
+    const res = await apiClient.post<LoginResponse>('/auth/login', {
+      ...values,
+      captchaToken,
+      confirmed,
+      loginAs: 'manager',
+    })
     localStorage.setItem('platformToken', res.data.token)
     localStorage.setItem('platformAccount', res.data.employeenum)
     localStorage.setItem('platformChname', res.data.chname)
