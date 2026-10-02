@@ -45,6 +45,7 @@ const TIER_ROWS: { background: string; rightNames: string[] }[] = [
       '維護作業|簽核代理人維護',
       '維護作業|出勤明細報表',
       '維護作業|通知廣播',
+      '維護作業|出勤異常通知',
     ],
   },
   {

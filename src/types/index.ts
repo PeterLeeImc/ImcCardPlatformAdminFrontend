@@ -163,6 +163,18 @@ export interface BroadcastNotificationRequest {
   content: string
 }
 
+// 出勤異常通知 (AttendanceAnomalyService自動產生，發給派遣個案負責使用者/系統管理者)
+
+export interface AttendanceAnomalyItem {
+  id: number
+  companyName: string
+  /** 查不到時為null(例如員工後來被刪除、沒有派遣個案等例外情形)。 */
+  dispatchCaseCode: string | null
+  content: string
+  sentTime: string
+  read: boolean
+}
+
 // 客戶維護 (companies)
 
 export interface CompanyListItem {

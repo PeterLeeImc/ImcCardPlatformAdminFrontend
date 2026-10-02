@@ -1,8 +1,11 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Space } from 'antd'
-import { LogoutOutlined } from '@ant-design/icons'
-import { clearSessionAndRedirectToLogin, OPERATING_DISPATCH_CASE_CHANGED_EVENT } from '../api/client'
+import { Badge, Space } from 'antd'
+import { BellOutlined, LogoutOutlined } from '@ant-design/icons'
+import { apiClient, clearSessionAndRedirectToLogin, OPERATING_DISPATCH_CASE_CHANGED_EVENT } from '../api/client'
+
+/** 出勤異常通知未讀徽章的輪詢間隔：「即時」用輪詢做(不是真的桌面推播)，45秒夠即時、又不會太頻繁打API。 */
+const ATTENDANCE_ANOMALY_POLL_MS = 45000
 
 /**
  * 全部功能頁面共用的頁首：左邊頁面標題、中間「首頁」連結+目前使用者身分+目前操作個案+登出、
@@ -28,6 +31,35 @@ export default function PageHeader({ title, actions }: { title: ReactNode; actio
     const onChange = () => setOperatingDispatchCaseLabel(readOperatingDispatchCaseLabel())
     window.addEventListener(OPERATING_DISPATCH_CASE_CHANGED_EVENT, onChange)
     return () => window.removeEventListener(OPERATING_DISPATCH_CASE_CHANGED_EVENT, onChange)
+  }, [])
+
+  // 出勤異常通知未讀徽章：沒有「維護作業|出勤異常通知」權限的帳號打這支API會是403，直接把鈴鐺藏起來，
+  // 不去額外呼叫/auth/admin-permissions多查一次權限清單。
+  const [anomalyUnreadCount, setAnomalyUnreadCount] = useState<number | null>(null)
+  const [anomalyBellVisible, setAnomalyBellVisible] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    const refresh = () => {
+      apiClient
+        .get<number>('/admin/attendance-anomalies/unread-count')
+        .then((res) => {
+          if (cancelled) return
+          setAnomalyUnreadCount(res.data)
+          setAnomalyBellVisible(true)
+        })
+        .catch(() => {
+          if (cancelled) return
+          setAnomalyBellVisible(false)
+        })
+    }
+    refresh()
+    const timer = setInterval(refresh, ATTENDANCE_ANOMALY_POLL_MS)
+    window.addEventListener('attendance-anomaly-read', refresh)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+      window.removeEventListener('attendance-anomaly-read', refresh)
+    }
   }, [])
 
   return (
@@ -66,6 +98,17 @@ export default function PageHeader({ title, actions }: { title: ReactNode; actio
           >
             目前操作個案：{operatingDispatchCaseLabel ?? '(未設定)'}
           </span>
+          {anomalyBellVisible && (
+            <span
+              onClick={() => navigate('/attendance-anomalies')}
+              style={{ cursor: 'pointer', flexShrink: 0 }}
+              title="出勤異常通知"
+            >
+              <Badge count={anomalyUnreadCount ?? 0} size="small" offset={[2, -2]}>
+                <BellOutlined style={{ fontSize: 16, color: '#666' }} />
+              </Badge>
+            </span>
+          )}
           <span
             onClick={clearSessionAndRedirectToLogin}
             style={{ cursor: 'pointer', color: '#1677ff', whiteSpace: 'nowrap', flexShrink: 0 }}

@@ -22,6 +22,7 @@ import EmpDayCardList from './pages/EmpDayCardList'
 import EmpDayLeaveList from './pages/EmpDayLeaveList'
 import EmpDayOvertimeList from './pages/EmpDayOvertimeList'
 import ApprovalDelegateList from './pages/ApprovalDelegateList'
+import AttendanceAnomalyList from './pages/AttendanceAnomalyList'
 import AttendanceDetailReport from './pages/AttendanceDetailReport'
 import LeaveTypeList from './pages/LeaveTypeList'
 import WorkOvertimeList from './pages/WorkOvertimeList'
@@ -244,6 +245,14 @@ export default function App() {
           element={
             <RequireAuth>
               <ApprovalDelegateList />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/attendance-anomalies"
+          element={
+            <RequireAuth>
+              <AttendanceAnomalyList />
             </RequireAuth>
           }
         />

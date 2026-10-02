@@ -26,6 +26,7 @@ import {
   CoffeeOutlined,
   HourglassOutlined,
   SwapOutlined,
+  AlertOutlined,
 } from '@ant-design/icons'
 
 const RESET_CONFIRM_TEXT = 'RESET'
@@ -183,6 +184,13 @@ export default function Home() {
           label: '通知廣播',
           desc: '發送全客戶廣播通知',
           icon: <NotificationOutlined style={{ fontSize: 32 }} />,
+        },
+        {
+          key: '/attendance-anomalies',
+          rightName: '維護作業|出勤異常通知',
+          label: '出勤異常通知',
+          desc: '員工已排班卻遲到/忘記打卡時的系統自動通知',
+          icon: <AlertOutlined style={{ fontSize: 32 }} />,
         },
       ],
     },
